@@ -383,6 +383,12 @@ Color3_fromRGB(255, 255, 255), -- White
 
 getgenv().pixelEdgeDetection = true -- Enable simple edge detection for contours
 
+getgenv().pixelSpatialClustering = true -- Enable spatial clustering for better grouping
+
+getgenv().pixelTemporalCoherence = true -- Enable temporal tracking for stability
+
+getgenv().pixelHistogramMatching = true -- Enable color histogram matching
+
 
 
 
@@ -392,7 +398,11 @@ getgenv().pixelEdgeDetection = true -- Enable simple edge detection for contours
 
 ----------------------------------------------------
 
+-- Enhanced linearization LUT with precomputed values for faster access
 local linearLUT = {}
+local labCache = {} -- Cache for LAB conversions
+local cacheSize = 0
+local MAX_CACHE_SIZE = 1000
 
 for i = 0, 255 do
 
@@ -451,11 +461,25 @@ end
 
 
 
+-- Cached LAB conversion with memoization for performance
 local function rgb_to_lab(r, g, b)
-
-local x, y, z = rgb_to_xyz(r, g, b)
-
-return xyz_to_lab(x, y, z)
+	-- Create cache key
+	local key = r * 65536 + g * 256 + b
+	
+	if labCache[key] then
+		return labCache[key].L, labCache[key].a, labCache[key].b
+	end
+	
+	local x, y, z = rgb_to_xyz(r, g, b)
+	local L, a, b_val = xyz_to_lab(x, y, z)
+	
+	-- Cache with size limit
+	if cacheSize < MAX_CACHE_SIZE then
+		labCache[key] = {L = L, a = a, b = b_val}
+		cacheSize = cacheSize + 1
+	end
+	
+	return L, a, b_val
 
 end
 
@@ -483,13 +507,15 @@ end
 
 
 
+-- Enhanced CIEDE2000 with perceptual weighting for gaming scenarios
 local function colorDifference(c1, c2)
 
 local L1, a1, b1 = c1.L, c1.a, c1.b
 
 local L2, a2, b2 = c2.L, c2.a, c2.b
 
-local kL, kC, kH = 1, 1, 1
+-- Perceptual weighting factors optimized for target detection
+local kL, kC, kH = 1.2, 1.0, 0.8  -- Increased lightness sensitivity, reduced hue sensitivity
 
 local dL = L2 - L1
 
@@ -498,6 +524,11 @@ local mL = (L1 + L2) / 2
 local C1 = math_sqrt(a1 * a1 + b1 * b1)
 
 local C2 = math_sqrt(a2 * a2 + b2 * b2)
+
+-- Early exit for very similar colors (performance optimization)
+if math_abs(dL) < 1 and math_abs(C1 - C2) < 1 then
+	return 0.5
+end
 
 local mC = (C1 + C2) / 2
 
@@ -576,6 +607,7 @@ end
 
 
 
+-- Enhanced pixel comparison with spatial weighting and confidence scoring
 local function comparePixelData(targetPixels, hitPixels)
 
 local config = getgenv().aimConfig
@@ -587,8 +619,13 @@ if totalPixels == 0 then return 0 end
 local precomputedTarget = precomputeLab(targetPixels)
 
 local cumulativeScore = 0
+local confidenceSum = 0
 
 local weight = config.HIT_PIXEL_WEIGHT * 1.5 -- adjust weight as needed
+
+-- Spatial coherence checking: pixels near each other should be similar
+local spatialBonus = 0
+local prevDiff = nil
 
 for i = 1, totalPixels do
 
@@ -599,12 +636,26 @@ local L, a, b = rgb_to_lab(hit.r, hit.g, hit.b)
 local labHit = { L = L, a = a, b = b }
 
 local diff = colorDifference(precomputedTarget[i], labHit)
-
-cumulativeScore = cumulativeScore + (1 / (1 + weight * diff))
+	
+	-- Spatial coherence bonus: if consecutive pixels have similar differences, increase confidence
+	if prevDiff and math_abs(diff - prevDiff) < 2.0 then
+		spatialBonus = spatialBonus + 0.1
+	end
+	prevDiff = diff
+	
+	local pixelScore = 1 / (1 + weight * diff)
+	cumulativeScore = cumulativeScore + pixelScore
+	
+	-- Confidence based on how well the pixel matches
+	confidenceSum = confidenceSum + (pixelScore > 0.7 and 1 or 0)
 
 end
 
-return cumulativeScore / totalPixels
+local avgScore = cumulativeScore / totalPixels
+local confidence = confidenceSum / totalPixels
+
+-- Apply spatial coherence bonus
+return math_min(1.0, avgScore * (1 + spatialBonus * 0.5))
 
 end
 
@@ -620,6 +671,10 @@ end
 
 
 
+-- Enhanced pixel hit detection with clustering and temporal coherence
+local pixelHistory = {}  -- Temporal coherence tracking
+local historySize = 5
+
 local function performPixelHitDetection(targetPixels, hitPixels, prevSimilarity, centerX, centerY)
 
 local config = getgenv().aimConfig
@@ -628,11 +683,7 @@ local totalPixels = math_min(#targetPixels, #hitPixels)
 
 if totalPixels == 0 then return false, 0 end
 
-
-
-
 -- Enhanced: Prioritize by distance to center with prediction smoothing
-
 local prioritizedHits = {}
 
 for i = 1, #hitPixels do
@@ -655,28 +706,60 @@ end
 
 table_sort(prioritizedHits, function(a, b) return a.dist < b.dist end)
 
-
-
-
--- Limit to top closest for performance, with multi-scale if enabled
-
-local topHits = {}
-
-local limit = getgenv().pixelMultiScale and 15 or 10 -- More for multi-scale
-
-for i = 1, math_min(limit, #prioritizedHits) do
-
-table_insert(topHits, prioritizedHits[i].hit)
-
+-- Spatial clustering: group nearby pixels for better matching
+local clusters = {}
+local clusterRadius = 10
+for i = 1, #prioritizedHits do
+	local hit = prioritizedHits[i]
+	local foundCluster = false
+	
+	for _, cluster in ipairs(clusters) do
+		local centerX = cluster.centerX or hit.hit.x
+		local centerY = cluster.centerY or hit.hit.y
+		local dist = math_sqrt((hit.hit.x - centerX)^2 + (hit.hit.y - centerY)^2)
+		
+		if dist <= clusterRadius then
+			table_insert(cluster.pixels, hit.hit)
+			cluster.centerX = (cluster.centerX * #cluster.pixels + hit.hit.x) / (#cluster.pixels + 1)
+			cluster.centerY = (cluster.centerY * #cluster.pixels + hit.hit.y) / (#cluster.pixels + 1)
+			foundCluster = true
+			break
+		end
+	end
+	
+	if not foundCluster and #clusters < 5 then
+		table_insert(clusters, {
+			pixels = {hit.hit},
+			centerX = hit.hit.x,
+			centerY = hit.hit.y
+		})
+	end
 end
 
+-- Use the largest cluster or prioritize by density
+local topHits = {}
+local limit = getgenv().pixelMultiScale and 20 or 12
 
-
+if #clusters > 0 then
+	-- Sort clusters by size
+	table_sort(clusters, function(a, b) return #a.pixels > #b.pixels end)
+	
+	-- Take pixels from the largest cluster first
+	for _, cluster in ipairs(clusters) do
+		for _, pixel in ipairs(cluster.pixels) do
+			table_insert(topHits, pixel)
+			if #topHits >= limit then break end
+		end
+		if #topHits >= limit then break end
+	end
+else
+	-- Fallback to distance-based selection
+	for i = 1, math_min(limit, #prioritizedHits) do
+		table_insert(topHits, prioritizedHits[i].hit)
+	end
+end
 
 local similarity = comparePixelData(targetPixels, topHits)
-
-
-
 
 -- Adaptive threshold based on lighting (if enabled)
 
@@ -685,23 +768,48 @@ local adaptiveThreshold = config.HIT_PIXEL_THRESHOLD
 if getgenv().pixelAdaptiveThreshold then
 
 local avgBrightness = 0
+local maxBrightness = 0
+local minBrightness = 1
 
 for _, p in ipairs(targetPixels) do
+	local brightness = (p.r + p.g + p.b) / (3 * 255)
+	avgBrightness = avgBrightness + brightness
+	maxBrightness = math_max(maxBrightness, brightness)
+	minBrightness = math_min(minBrightness, brightness)
+end
 
-avgBrightness = avgBrightness + p.r + p.g + p.b
+avgBrightness = avgBrightness / #targetPixels
+local contrast = maxBrightness - minBrightness
+
+-- Adjust threshold based on both brightness and contrast
+adaptiveThreshold = config.HIT_PIXEL_THRESHOLD * (1 + (avgBrightness - 0.5) * 0.3)
+adaptiveThreshold = adaptiveThreshold * (1 - contrast * 0.2)  -- Lower threshold for high contrast
 
 end
 
-avgBrightness = avgBrightness / (#targetPixels * 3)
-
-adaptiveThreshold = config.HIT_PIXEL_THRESHOLD * (1 + (avgBrightness - 0.5) * 0.2) -- Adjust based on brightness
-
+-- Temporal coherence: track detection history
+table_insert(pixelHistory, {similarity = similarity, time = tick()})
+if #pixelHistory > historySize then
+	table_remove(pixelHistory, 1)
 end
 
-
-
+-- Calculate temporal stability bonus
+local temporalBonus = 0
+if #pixelHistory >= 3 then
+	local avgHistorySim = 0
+	for _, entry in ipairs(pixelHistory) do
+		avgHistorySim = avgHistorySim + entry.similarity
+	end
+	avgHistorySim = avgHistorySim / #pixelHistory
+	
+	-- If current similarity is consistent with history, boost confidence
+	if math_abs(similarity - avgHistorySim) < 0.15 then
+		temporalBonus = 0.05
+	end
+end
 
 local smoothedSimilarity = exponentialMovingAverage(prevSimilarity or 0, similarity, config.HIT_PIXEL_INTERPOLATION)
+smoothedSimilarity = math_min(1.0, smoothedSimilarity + temporalBonus)
 
 return smoothedSimilarity >= adaptiveThreshold, smoothedSimilarity
 
@@ -723,77 +831,183 @@ end
 
 
 
--- Added Multi-Scale Scanning for Better Detection
+-- Enhanced Multi-Scale Scanning with pyramid approach
+local function scanAtScale(scale, targetPixels, hitPixels, centerX, centerY)
+	-- Multi-scale detection using different sampling rates
+	local scaledRadius = getgenv().pixelFovRadius * scale
+	local stepSize = math_max(1, math_floor(scale))
+	
+	-- Filter hit pixels based on scaled radius
+	local scaledHits = {}
+	for i = 1, #hitPixels, stepSize do
+		local hit = hitPixels[i]
+		if hit.x and hit.y then
+			local distance = math_sqrt((hit.x - centerX)^2 + (hit.y - centerY)^2)
+			if distance <= scaledRadius then
+				table_insert(scaledHits, hit)
+			end
+		end
+	end
+	
+	-- Perform detection at this scale
+	if #scaledHits > 0 then
+		return performPixelHitDetection(targetPixels, scaledHits, 0, centerX, centerY)
+	end
+	
+	return false, 0
 
-local function scanAtScale(scale, targetPixels, centerX, centerY)
+end
 
--- Implement simple multi-scale by adjusting radius or step, but since Lua doesn't have native image processing, this is placeholder
-
--- In real implementation, you'd capture screenshots at different scales and compare
-
--- For now, just use the same data with adjusted radius
-
-local scaledRadius = getgenv().pixelFovRadius * scale
-
--- Placeholder: Assume hitPixels are filtered
-
-return performPixelHitDetection(targetPixels, {}, 0, centerX, centerY) -- Mock
+-- Multi-scale pyramid detection combining results from multiple scales
+local function multiScalePyramidDetection(targetPixels, hitPixels, centerX, centerY)
+	if not getgenv().pixelMultiScale then
+		return performPixelHitDetection(targetPixels, hitPixels, 0, centerX, centerY)
+	end
+	
+	local scales = {0.5, 0.75, 1.0, 1.25, 1.5}  -- Different scale factors
+	local bestResult = false
+	local bestSimilarity = 0
+	local scaleVotes = 0
+	
+	for _, scale in ipairs(scales) do
+		local detected, similarity = scanAtScale(scale, targetPixels, hitPixels, centerX, centerY)
+		
+		if detected then
+			scaleVotes = scaleVotes + 1
+		end
+		
+		if similarity > bestSimilarity then
+			bestSimilarity = similarity
+			bestResult = detected
+		end
+	end
+	
+	-- Require consensus from multiple scales for higher confidence
+	local consensusThreshold = math_ceil(#scales / 2)
+	return (scaleVotes >= consensusThreshold) and bestResult, bestSimilarity
 
 end
 
 
 
 
--- Added Multiple Color Detection
-
-local function detectMultipleColors(hitPixels, targetColors)
-
-local bestSimilarity = 0
-
-for _, color in ipairs(targetColors) do
-
-local targetPixels = { { r = color.R * 255, g = color.G * 255, b = color.B * 255 } } -- Single color target
-
-local _, similarity = performPixelHitDetection(targetPixels, hitPixels, 0, 0, 0)
-
-if similarity > bestSimilarity then
-
-bestSimilarity = similarity
+-- Enhanced Multiple Color Detection with color histogram matching
+local function detectMultipleColors(hitPixels, targetColors, centerX, centerY)
+	local bestSimilarity = 0
+	local bestColor = nil
+	local colorScores = {}
+	
+	-- Build color histogram for hit pixels
+	local histogram = {}
+	for _, hit in ipairs(hitPixels) do
+		-- Quantize colors to reduce dimensionality
+		local rBin = math_floor(hit.r / 32) * 32
+		local gBin = math_floor(hit.g / 32) * 32
+		local bBin = math_floor(hit.b / 32) * 32
+		local key = rBin * 65536 + gBin * 256 + bBin
+		histogram[key] = (histogram[key] or 0) + 1
+	end
+	
+	-- Compare each target color against the histogram
+	for _, color in ipairs(targetColors) do
+		local targetPixels = { { r = color.R * 255, g = color.G * 255, b = color.B * 255 } }
+		
+		-- Check if this color is present in histogram
+		local rBin = math_floor(color.R * 255 / 32) * 32
+		local gBin = math_floor(color.G * 255 / 32) * 32
+		local bBin = math_floor(color.B * 255 / 32) * 32
+		local key = rBin * 65536 + gBin * 256 + bBin
+		local histogramMatch = (histogram[key] or 0) / math_max(1, #hitPixels)
+		
+		-- Perform detailed pixel detection
+		local _, similarity = performPixelHitDetection(targetPixels, hitPixels, 0, centerX or 0, centerY or 0)
+		
+		-- Combine histogram match with detailed similarity
+		local combinedScore = (similarity * 0.7 + histogramMatch * 0.3)
+		
+		table_insert(colorScores, {color = color, score = combinedScore})
+		
+		if combinedScore > bestSimilarity then
+			bestSimilarity = combinedScore
+			bestColor = color
+		end
+	end
+	
+	-- Sort by score for potential multi-target scenarios
+	table_sort(colorScores, function(a, b) return a.score > b.score end)
+	
+	return bestSimilarity >= getgenv().aimConfig.HIT_PIXEL_THRESHOLD, bestSimilarity, bestColor
 
 end
 
-end
-
-return bestSimilarity >= getgenv().aimConfig.HIT_PIXEL_THRESHOLD, bestSimilarity
-
-end
 
 
 
-
--- Added Simple Edge Detection
-
-local function detectEdges(hitPixels)
-
--- Simple edge detection by checking color differences with neighbors
-
-local edges = {}
-
-for i = 2, #hitPixels - 1 do
-
-local diff1 = colorDifference(hitPixels[i-1], hitPixels[i])
-
-local diff2 = colorDifference(hitPixels[i], hitPixels[i+1])
-
-if diff1 > 10 or diff2 > 10 then -- Threshold for edge
-
-table_insert(edges, hitPixels[i])
-
-end
-
-end
-
-return edges
+-- Enhanced Edge Detection with Sobel-like gradient calculation
+local function detectEdges(hitPixels, width, height)
+	local edges = {}
+	
+	-- If width/height not provided, assume 1D array
+	if not width or not height then
+		-- Simple 1D edge detection
+		for i = 2, #hitPixels - 1 do
+			local prev = hitPixels[i-1]
+			local curr = hitPixels[i]
+			local next = hitPixels[i+1]
+			
+			-- Convert to grayscale for gradient calculation
+			local prevGray = (prev.r + prev.g + prev.b) / 3
+			local currGray = (curr.r + curr.g + curr.b) / 3
+			local nextGray = (next.r + next.g + next.b) / 3
+			
+			-- Calculate gradient
+			local gradient = math_abs(nextGray - prevGray)
+			
+			-- Adaptive threshold based on local contrast
+			local localThreshold = math_max(5, (prevGray + nextGray) / 20)
+			
+			if gradient > localThreshold then
+				table_insert(edges, {pixel = curr, strength = gradient, index = i})
+			end
+		end
+		return edges
+	end
+	
+	-- 2D Sobel edge detection for structured pixel data
+	for y = 2, height - 1 do
+		for x = 2, width - 1 do
+			local idx = (y - 1) * width + x
+			
+			if idx <= #hitPixels then
+				-- Get 3x3 neighborhood
+				local tl = hitPixels[idx - width - 1] or hitPixels[idx]
+				local tc = hitPixels[idx - width] or hitPixels[idx]
+				local tr = hitPixels[idx - width + 1] or hitPixels[idx]
+				local ml = hitPixels[idx - 1] or hitPixels[idx]
+				local mc = hitPixels[idx]
+				local mr = hitPixels[idx + 1] or hitPixels[idx]
+				local bl = hitPixels[idx + width - 1] or hitPixels[idx]
+				local bc = hitPixels[idx + width] or hitPixels[idx]
+				local br = hitPixels[idx + width + 1] or hitPixels[idx]
+				
+				-- Convert to grayscale
+				local function gray(p) return (p.r + p.g + p.b) / 3 end
+				
+				-- Sobel operators
+				local gx = -gray(tl) - 2*gray(ml) - gray(bl) + gray(tr) + 2*gray(mr) + gray(br)
+				local gy = -gray(tl) - 2*gray(tc) - gray(tr) + gray(bl) + 2*gray(bc) + gray(br)
+				
+				-- Gradient magnitude
+				local magnitude = math_sqrt(gx*gx + gy*gy)
+				
+				if magnitude > 15 then
+					table_insert(edges, {pixel = mc, strength = magnitude, x = x, y = y})
+				end
+			end
+		end
+	end
+	
+	return edges
 
 end
 
@@ -806,9 +1020,32 @@ end
 
 ----------------------------------------------------
 
+local cacheCleanupTimer = 0
+local cacheCleanupInterval = 30 -- Clear cache every 30 seconds
+
 RunService.Heartbeat:Connect(function(dt)
 
 -- Additional per-frame actions can be added here if needed.
+
+-- Periodic cache cleanup to prevent memory bloat
+cacheCleanupTimer = cacheCleanupTimer + dt
+if cacheCleanupTimer >= cacheCleanupInterval then
+	-- Clear old LAB cache entries
+	if cacheSize > MAX_CACHE_SIZE * 0.8 then
+		labCache = {}
+		cacheSize = 0
+	end
+	
+	-- Clean old pixel history
+	local currentTime = tick()
+	for i = #pixelHistory, 1, -1 do
+		if currentTime - pixelHistory[i].time > 2.0 then
+			table_remove(pixelHistory, i)
+		end
+	end
+	
+	cacheCleanupTimer = 0
+end
 
 end)
 
@@ -1368,6 +1605,54 @@ Value = {Min = 0.01, Max = 1.0, Default = 0.1},
 Callback = function(value)
 
 getgenv().pixelSmoothingFactor = tonumber(value)
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Spatial Clustering",
+
+Desc = "Group nearby pixels for better detection accuracy",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelSpatialClustering = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Temporal Coherence",
+
+Desc = "Track detection history for stable targeting",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelTemporalCoherence = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Histogram Matching",
+
+Desc = "Use color histogram for faster color matching",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelHistogramMatching = state
 
 end,
 
