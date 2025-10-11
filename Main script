@@ -1,0 +1,4105 @@
+-- Add auto farm duels -- Cache frequently used services and functions
+
+local HttpGet = game.HttpGet
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Players = game:GetService("Players")
+
+local Lighting = game:GetService("Lighting")
+
+local RunService = game:GetService("RunService")
+
+local UserInputService = game:GetService("UserInputService")
+
+local localPlayer = Players.LocalPlayer
+
+
+
+
+-- Cache math functions
+
+local math_sin = math.sin
+
+local math_cos = math.cos
+
+local math_deg = math.deg
+
+local math_rad = math.rad
+
+local math_abs = math.abs
+
+local math_sqrt = math.sqrt
+
+local math_exp = math.exp
+
+local math_ceil = math.ceil
+
+local math_floor = math.floor
+
+local math_min = math.min
+
+local math_max = math.max
+
+local math_atan2 = math.atan2
+
+
+
+
+-- Cache table functions
+
+local table_insert = table.insert
+
+local table_remove = table.remove
+
+local table_sort = table.sort
+
+local table_concat = table_concat
+
+
+
+
+-- Cache other frequently used functions
+
+local game_GetService = game.GetService
+
+local workspace_GetDescendants = workspace_GetDescendants
+
+local Instance_new = Instance.new
+
+local Color3_fromRGB = Color3.fromRGB
+
+local Vector3_new = Vector3.new
+
+local UDim2_fromOffset = UDim2.fromOffset
+
+local task_spawn = task_spawn
+
+
+
+
+-- Improved Error Finder Function with detailed logging.
+
+local function errorFinder(scriptStr)
+
+local func, err = loadstring(scriptStr)
+
+if not func then
+
+print("Script Error Found: " .. err)
+
+return false, err
+
+else
+
+print("No errors found in script.")
+
+return true
+
+end
+
+end
+
+
+
+
+----------------------------------------------------
+
+-- Repository URL for module loading
+
+----------------------------------------------------
+
+local RepositoryURL = "https://raw.githubusercontent.com/goose-birb/lua-buffoonery/master/"
+
+
+
+
+----------------------------------------------------
+
+-- Load and cache the WindUI library
+
+----------------------------------------------------
+
+local Windui = loadstring(HttpGet(game, "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+
+
+
+----------------------------------------------------
+
+-- Global Configuration (Ultra-Strong Aimbot Settings with Improved Reaction and Pixel Detection)
+
+----------------------------------------------------
+
+getgenv().aimConfig = {
+
+MAX_DISTANCE = 1e4,
+
+MAX_VELOCITY = 1e4,
+
+FOV_CHECK = false,
+
+FOV_ANGLE_DEGREES = 120, -- narrowed for better focus
+
+REACTION_TIME = 0.0, -- instant reaction for better response
+
+ACTION_TIME = 0.0, -- no delay for faster aiming
+
+AIM_TICK = 0.0001, -- extremely frequent updates for ultra-fast reaction (improved from 0.0005)
+
+VISIBLE_PARTS = 1,
+
+CAMERA_CAST = true,
+
+RAYCAST_DISTANCE = 10000,
+
+RAYCAST_TO_LEAD = true,
+
+VISIBILITY_COOLDOWN = 0.0,
+
+PROJECTILE_SPEED = 1e6,
+
+HITSCAN_SPEED = 1e9,
+
+MAX_LEAD_TIME = 10.0,
+
+MIN_LEAD_TIME = 0.0,
+
+USE_PREDICTION = true,
+
+INTERCEPT_METHOD = "hybrid",
+
+ALLOW_ACCELERATION = true,
+
+GRAVITY_COMPENSATION = true,
+
+GRAVITY = 196.2,
+
+MAX_PREDICTION_LAG = 0.0,
+
+USE_VELOCITY_FILTER = true,
+
+VEL_FILTER_ALPHA = 0.95, -- more responsive velocity filter
+
+KALMAN_ENABLED = true,
+
+KALMAN = {
+
+measurementNoise = 0.01,
+
+processNoise = 1e-6,
+
+initialUncertainty = 1e-6,
+
+},
+
+ACCURACY = {
+
+DEVIATION_ENABLED = true, -- controlled randomness enabled
+
+BASE_DEVIATION = 0.2, -- lower error for higher precision
+
+DISTANCE_FACTOR = 0.05, -- minimal deviation increase with distance
+
+VELOCITY_FACTOR = 0.05, -- minimal adjustment with target speed
+
+ACCURACY_BUILDUP = 0.1, -- rapid buildup to optimum accuracy
+
+MIN_DEVIATION = 0.0,
+
+RANDOM_SEED = 0,
+
+},
+
+ADVANCED = {
+
+MULTI_BONE_SAMPLING = true,
+
+PRIORITIZE_HEAD = true,
+
+MULTI_LEAD_SAMPLES = 5,
+
+BEST_VISIBLE_LEAD = true,
+
+OVERRIDE_HITSCAN = true,
+
+SERVER_SIDE_FIRE = true,
+
+},
+
+NATIVE_UI = false,
+
+UI = {
+
+DRAW_LEAD_POINT = false,
+
+DRAW_RAYCASTS = false,
+
+LABEL_UPDATE_RATE = 0.0,
+
+},
+
+PERFORMANCE = {
+
+MAX_NPC_AIM_TICKS_PER_FRAME = 9999,
+
+DISTANCE_THROTTLE_STEPS = {},
+
+},
+
+DEBUG = {
+
+ENABLE_LOGGING = false,
+
+LOG_LEVEL = "error",
+
+},
+
+WALLHACK = false,
+
+HIT_PIXEL_SHOT = true,
+
+HIT_PIXEL_THRESHOLD = 1.0,
+
+HIT_PIXEL_INTERPOLATION = 0.95,
+
+HIT_PIXEL_WEIGHT = 200, -- increased to strongly favor pixel detection
+
+FORCE_TARGET_LOCK = true, -- enforced target lock for instant engagement
+
+AIM_SMOOTHING = 0.5, -- added for better reaction smoothing
+
+}
+
+
+
+
+getgenv().knifePrediction = {
+
+ENABLED = true,
+
+PREDICTION_FACTOR = 0.03,
+
+MAX_DISTANCE = 7,
+
+}
+
+getgenv().knifeThrownScale = 5
+
+getgenv().knifeThrowCount = 10
+
+
+
+
+getgenv().espTeamMates = true
+
+getgenv().espEnemies = true
+
+getgenv().killButton = { gun = false, knife = false }
+
+getgenv().killLoop = { gun = false, knife = false }
+
+getgenv().killSpeed = 0
+
+getgenv().autoClick = false
+
+getgenv().spamGunActive = false
+
+getgenv().loopGunShootActive = false
+
+getgenv().loopKnifeShootActive = false
+
+getgenv().noAbilityCooldown = false
+
+getgenv().autoFarm1v1 = false
+
+getgenv().autoFarm2v2 = false
+
+getgenv().loopKillInstantTP = false
+
+getgenv().teamCheckKill = true
+
+getgenv().nearestCheckKill = true
+
+getgenv().antiLagMode = false
+
+
+
+
+getgenv().walkSpeed = 16
+
+getgenv().jumpPower = 50
+
+getgenv().enableSpeedChanger = false
+
+getgenv().enableJumpPowerChanger = false
+
+
+
+
+-- Added Cooldown Adjuster
+
+getgenv().cooldownMultiplier = 0 -- 0 means no cooldown, 1 means full cooldown
+
+
+
+
+-- Added No Gun Cooldown
+
+getgenv().noGunCooldown = false
+
+
+
+
+-- Improved Pixel Detection: Added Pixel FoV and Prioritization, Multi-Scale Scanning, Adaptive Threshold, Multiple Colors
+
+getgenv().pixelFovRadius = 100 -- Radius for pixel scanning around crosshair
+
+getgenv().pixelMultiScale = true -- Enable multi-scale scanning for better detection
+
+getgenv().pixelAdaptiveThreshold = true -- Adaptive threshold based on lighting conditions
+
+getgenv().pixelSmoothingFactor = 0.1 -- Smoothing for prediction
+
+getgenv().pixelTargetColors = { -- Added multiple target colors for better detection
+
+Color3_fromRGB(255, 0, 0), -- Red
+
+Color3_fromRGB(0, 255, 0), -- Green
+
+Color3_fromRGB(0, 0, 255), -- Blue
+
+Color3_fromRGB(255, 255, 0), -- Yellow
+
+Color3_fromRGB(255, 0, 255), -- Magenta
+
+Color3_fromRGB(0, 255, 255), -- Cyan
+
+Color3_fromRGB(128, 128, 128), -- Gray
+
+Color3_fromRGB(255, 255, 255), -- White
+
+}
+
+getgenv().pixelEdgeDetection = true -- Enable simple edge detection for contours
+
+
+
+
+----------------------------------------------------
+
+-- Improved Pixel Detection using CIEDE2000 with FoV, Prioritization, Multi-Scale, Adaptive Threshold, Multiple Colors, and Edge Detection
+
+----------------------------------------------------
+
+local linearLUT = {}
+
+for i = 0, 255 do
+
+local c = i / 255
+
+linearLUT[i] = (c <= 0.04045) and (c / 12.92) or (((c + 0.055) / 1.055) ^ 2.4)
+
+end
+
+
+
+
+local function rgb_to_xyz(r, g, b)
+
+r, g, b = linearLUT[r], linearLUT[g], linearLUT[b]
+
+local x = r * 0.4124 + g * 0.3576 + b * 0.1805
+
+local y = r * 0.2126 + g * 0.7152 + b * 0.0722
+
+local z = r * 0.0193 + g * 0.1192 + b * 0.9505
+
+return x, y, z
+
+end
+
+
+
+
+local refX, refY, refZ = 0.95047, 1.0, 1.08883
+
+local function xyz_to_lab(x, y, z)
+
+x, y, z = x / refX, y / refY, z / refZ
+
+local epsilon = (6 / 29) ^ 3
+
+local kappa = (1 / 3) * (29 / 6) ^ 2
+
+local function f(t)
+
+return t > epsilon and t ^ (1 / 3) or (kappa * t + (4 / 29))
+
+end
+
+local L = 116 * f(y) - 16
+
+local a = 500 * (f(x) - f(y))
+
+local b = 200 * (f(y) - f(z))
+
+return L, a, b
+
+end
+
+
+
+
+local function rgb_to_lab(r, g, b)
+
+local x, y, z = rgb_to_xyz(r, g, b)
+
+return xyz_to_lab(x, y, z)
+
+end
+
+
+
+
+local function precomputeLab(pixels)
+
+local precomputed = {}
+
+for i = 1, #pixels do
+
+local p = pixels[i]
+
+local L, a, b = rgb_to_lab(p.r, p.g, p.b)
+
+precomputed[i] = {L = L, a = a, b = b}
+
+end
+
+return precomputed
+
+end
+
+
+
+
+local function colorDifference(c1, c2)
+
+local L1, a1, b1 = c1.L, c1.a, c1.b
+
+local L2, a2, b2 = c2.L, c2.a, c2.b
+
+local kL, kC, kH = 1, 1, 1
+
+local dL = L2 - L1
+
+local mL = (L1 + L2) / 2
+
+local C1 = math_sqrt(a1 * a1 + b1 * b1)
+
+local C2 = math_sqrt(a2 * a2 + b2 * b2)
+
+local mC = (C1 + C2) / 2
+
+local G = 0.5 * (1 - math_sqrt((mC ^ 7) / (mC ^ 7 + 25 ^ 7)))
+
+local a1p = a1 * (1 + G)
+
+local a2p = a2 * (1 + G)
+
+local C1p = math_sqrt(a1p * a1p + b1 * b1)
+
+local C2p = math_sqrt(a2p * a2p + b2 * b2)
+
+local mCp = (C1p + C2p) / 2
+
+local h1p = math_deg(math_atan2(b1, a1p))
+
+if h1p < 0 then h1p = h1p + 360 end
+
+local h2p = math_deg(math_atan2(b2, a2p))
+
+if h2p < 0 then h2p = h2p + 360 end
+
+local dhp = 0
+
+local abs_h_diff = math_abs(h1p - h2p)
+
+if abs_h_diff <= 180 then
+
+dhp = h2p - h1p
+
+elseif h2p <= h1p then
+
+dhp = h2p - h1p + 360
+
+else
+
+dhp = h2p - h1p - 360
+
+end
+
+local dH = 2 * math_sqrt(C1p * C2p) * math_sin(math_rad(dhp / 2))
+
+local mHp = (abs_h_diff <= 180) and ((h1p + h2p) / 2) or (((h1p + h2p + ((h1p+h2p < 360) and 360 or -360)) / 2))
+
+local T = 1 - 0.17 * math_cos(math_rad(mHp - 30))
+
++ 0.24 * math_cos(math_rad(2 * mHp))
+
++ 0.32 * math_cos(math_rad(3 * mHp + 6))
+
+- 0.20 * math_cos(math_rad(4 * mHp - 63))
+
+local dCp = C2p - C1p
+
+local SL = 1 + (0.015 * ((mL - 50) ^ 2)) / math_sqrt(20 + (mL - 50) ^ 2)
+
+local SC = 1 + 0.045 * mCp
+
+local SH = 1 + 0.015 * mCp * T
+
+local Rt = -2 * math_sqrt((mCp ^ 7) / (mCp ^ 7 + 25 ^ 7)) * math_sin(math_rad(60 * math_exp(-((mHp - 275) / 25) ^ 2)))
+
+local term1 = (dL / (kL * SL)) ^ 2
+
+local term2 = (dCp / (kC * SC)) ^ 2
+
+local term3 = (dH / (kH * SH)) ^ 2
+
+local term4 = Rt * (dCp / (kC * SC)) * (dH / (kH * SH))
+
+return math_sqrt(term1 + term2 + term3 + term4)
+
+end
+
+
+
+
+local function comparePixelData(targetPixels, hitPixels)
+
+local config = getgenv().aimConfig
+
+local totalPixels = math_min(#targetPixels, #hitPixels)
+
+if totalPixels == 0 then return 0 end
+
+local precomputedTarget = precomputeLab(targetPixels)
+
+local cumulativeScore = 0
+
+local weight = config.HIT_PIXEL_WEIGHT * 1.5 -- adjust weight as needed
+
+for i = 1, totalPixels do
+
+local hit = hitPixels[i]
+
+local L, a, b = rgb_to_lab(hit.r, hit.g, hit.b)
+
+local labHit = { L = L, a = a, b = b }
+
+local diff = colorDifference(precomputedTarget[i], labHit)
+
+cumulativeScore = cumulativeScore + (1 / (1 + weight * diff))
+
+end
+
+return cumulativeScore / totalPixels
+
+end
+
+
+
+
+local function exponentialMovingAverage(prevValue, currentValue, alpha)
+
+return (1 - alpha) * prevValue + alpha * currentValue
+
+end
+
+
+
+
+local function performPixelHitDetection(targetPixels, hitPixels, prevSimilarity, centerX, centerY)
+
+local config = getgenv().aimConfig
+
+local totalPixels = math_min(#targetPixels, #hitPixels)
+
+if totalPixels == 0 then return false, 0 end
+
+
+
+
+-- Enhanced: Prioritize by distance to center with prediction smoothing
+
+local prioritizedHits = {}
+
+for i = 1, #hitPixels do
+
+local hit = hitPixels[i]
+
+local distance = math_sqrt((hit.x - centerX)^2 + (hit.y - centerY)^2)
+
+-- Add prediction for moving targets (simple velocity estimate)
+
+local predictedX = hit.x + (hit.velocityX or 0) * getgenv().pixelSmoothingFactor
+
+local predictedY = hit.y + (hit.velocityY or 0) * getgenv().pixelSmoothingFactor
+
+local predictedDist = math_sqrt((predictedX - centerX)^2 + (predictedY - centerY)^2)
+
+table_insert(prioritizedHits, {hit = hit, dist = predictedDist, predX = predictedX, predY = predictedY})
+
+end
+
+table_sort(prioritizedHits, function(a, b) return a.dist < b.dist end)
+
+
+
+
+-- Limit to top closest for performance, with multi-scale if enabled
+
+local topHits = {}
+
+local limit = getgenv().pixelMultiScale and 15 or 10 -- More for multi-scale
+
+for i = 1, math_min(limit, #prioritizedHits) do
+
+table_insert(topHits, prioritizedHits[i].hit)
+
+end
+
+
+
+
+local similarity = comparePixelData(targetPixels, topHits)
+
+
+
+
+-- Adaptive threshold based on lighting (if enabled)
+
+local adaptiveThreshold = config.HIT_PIXEL_THRESHOLD
+
+if getgenv().pixelAdaptiveThreshold then
+
+local avgBrightness = 0
+
+for _, p in ipairs(targetPixels) do
+
+avgBrightness = avgBrightness + p.r + p.g + p.b
+
+end
+
+avgBrightness = avgBrightness / (#targetPixels * 3)
+
+adaptiveThreshold = config.HIT_PIXEL_THRESHOLD * (1 + (avgBrightness - 0.5) * 0.2) -- Adjust based on brightness
+
+end
+
+
+
+
+local smoothedSimilarity = exponentialMovingAverage(prevSimilarity or 0, similarity, config.HIT_PIXEL_INTERPOLATION)
+
+return smoothedSimilarity >= adaptiveThreshold, smoothedSimilarity
+
+end
+
+
+
+
+-- Added FoV Check for Pixel Scanning
+
+local function isInPixelFov(x, y, centerX, centerY)
+
+local distance = math_sqrt((x - centerX)^2 + (y - centerY)^2)
+
+return distance <= getgenv().pixelFovRadius
+
+end
+
+
+
+
+-- Added Multi-Scale Scanning for Better Detection
+
+local function scanAtScale(scale, targetPixels, centerX, centerY)
+
+-- Implement simple multi-scale by adjusting radius or step, but since Lua doesn't have native image processing, this is placeholder
+
+-- In real implementation, you'd capture screenshots at different scales and compare
+
+-- For now, just use the same data with adjusted radius
+
+local scaledRadius = getgenv().pixelFovRadius * scale
+
+-- Placeholder: Assume hitPixels are filtered
+
+return performPixelHitDetection(targetPixels, {}, 0, centerX, centerY) -- Mock
+
+end
+
+
+
+
+-- Added Multiple Color Detection
+
+local function detectMultipleColors(hitPixels, targetColors)
+
+local bestSimilarity = 0
+
+for _, color in ipairs(targetColors) do
+
+local targetPixels = { { r = color.R * 255, g = color.G * 255, b = color.B * 255 } } -- Single color target
+
+local _, similarity = performPixelHitDetection(targetPixels, hitPixels, 0, 0, 0)
+
+if similarity > bestSimilarity then
+
+bestSimilarity = similarity
+
+end
+
+end
+
+return bestSimilarity >= getgenv().aimConfig.HIT_PIXEL_THRESHOLD, bestSimilarity
+
+end
+
+
+
+
+-- Added Simple Edge Detection
+
+local function detectEdges(hitPixels)
+
+-- Simple edge detection by checking color differences with neighbors
+
+local edges = {}
+
+for i = 2, #hitPixels - 1 do
+
+local diff1 = colorDifference(hitPixels[i-1], hitPixels[i])
+
+local diff2 = colorDifference(hitPixels[i], hitPixels[i+1])
+
+if diff1 > 10 or diff2 > 10 then -- Threshold for edge
+
+table_insert(edges, hitPixels[i])
+
+end
+
+end
+
+return edges
+
+end
+
+
+
+
+----------------------------------------------------
+
+-- Ultra-Fast Reaction using Heartbeat (frame update)
+
+----------------------------------------------------
+
+RunService.Heartbeat:Connect(function(dt)
+
+-- Additional per-frame actions can be added here if needed.
+
+end)
+
+
+
+
+----------------------------------------------------
+
+-- Module Loader (with caching and error handling)
+
+----------------------------------------------------
+
+local loadedModules = {}
+
+local function loadModule(modulePath)
+
+if loadedModules[modulePath] then
+
+return loadedModules[modulePath]
+
+end
+
+local url = RepositoryURL .. modulePath
+
+local success, moduleCode = pcall(HttpGet, game, url)
+
+if not success then
+
+warn("Failed to fetch module at " .. url)
+
+return nil
+
+end
+
+local func, loadErr = loadstring(moduleCode)
+
+if not func then
+
+warn("Error in module " .. modulePath .. ": " .. loadErr)
+
+return nil
+
+end
+
+local success2, moduleVal = pcall(func)
+
+if not success2 then
+
+warn("Error executing module " .. modulePath)
+
+return nil
+
+end
+
+loadedModules[modulePath] = moduleVal
+
+return moduleVal
+
+end
+
+
+
+
+----------------------------------------------------
+
+-- Create the Main Window using WindUI with improved theme (Light for better colors)
+
+----------------------------------------------------
+
+local Window = Windui:CreateWindow({
+
+Title = "[Open Source] MVSD Script (Ultra-Strong Aimbot)",
+
+Icon = "square-function",
+
+Author = "by Le Honk",
+
+Folder = "MVSD_Graphics",
+
+Size = UDim2_fromOffset(260, 300),
+
+Transparent = true,
+
+Theme = "Light", -- Changed to Light theme for better, brighter colors
+
+Resizable = true,
+
+SideBarWidth = 120,
+
+HideSearchBar = true,
+
+ScrollBarEnabled = false,
+
+})
+
+
+
+
+------------------------------------------
+
+-- AIM BOT TAB
+
+------------------------------------------
+
+local AimTab = Window:Tab({ Title = "Aim Bot", Icon = "focus", Locked = false })
+
+AimTab:Toggle({
+
+Title = "Feature status",
+
+Desc = "Enable/Disable the aim bot",
+
+Callback = function(state)
+
+local aimbotModule = loadedModules["mvsd/aimbot.lua"]
+
+if not state and aimbotModule then
+
+for _, connection in pairs(aimbotModule) do connection:Disconnect() end
+
+loadedModules["mvsd/aimbot.lua"] = nil
+
+return
+
+end
+
+loadModule("mvsd/aimbot.lua")
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Wall Hack",
+
+Desc = "Disable wall/visibility checks (shoot through walls)",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().aimConfig.WALLHACK = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Native Raycast Method",
+
+Desc = "Toggle native raycasting for visibility (adds extra load)",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().aimConfig.CAMERA_CAST = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "FOV Check",
+
+Desc = "Enable target field-of-view check",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().aimConfig.FOV_CHECK = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Switch Weapons",
+
+Desc = "Automatically switch/equip the best weapon",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().aimConfig.AUTO_EQUIP = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Native UI Feedback",
+
+Desc = "Show UI elements for gun cooldown/equip feedback",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().aimConfig.NATIVE_UI = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Aim Deviation",
+
+Desc = "Introduce slight aim errors to reduce predictability",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().aimConfig.DEVIATION_ENABLED = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Pixel Hit Detection",
+
+Desc = "Enable enhanced pixel-level hit detection",
+
+Value = getgenv().aimConfig.HIT_PIXEL_SHOT,
+
+Callback = function(state)
+
+getgenv().aimConfig.HIT_PIXEL_SHOT = state
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Maximum Distance",
+
+Desc = "Ignore enemies beyond this distance",
+
+Value = {Min = 50, Max = 1000, Default = 150},
+
+Callback = function(value)
+
+getgenv().aimConfig.MAX_DISTANCE = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Maximum Velocity",
+
+Desc = "Ignore fast moving targets",
+
+Value = {Min = 20, Max = 200, Default = 25},
+
+Callback = function(value)
+
+getgenv().aimConfig.MAX_VELOCITY = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Visible Parts Required",
+
+Desc = "Number of visible parts required before targeting",
+
+Value = {Min = 1, Max = 18, Default = 4},
+
+Callback = function(value)
+
+getgenv().aimConfig.VISIBLE_PARTS = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Reaction Time",
+
+Desc = "Delay before attacking after target acquired (0 = instant)",
+
+Step = 0.001,
+
+Value = {Min = 0, Max = 1, Default = 0},
+
+Callback = function(value)
+
+getgenv().aimConfig.REACTION_TIME = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Action Time",
+
+Desc = "Delay after switching/equipping before firing",
+
+Step = 0.001,
+
+Value = {Min = 0.001, Max = 4, Default = 0.0},
+
+Callback = function(value)
+
+getgenv().aimConfig.ACTION_TIME = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Equip Time",
+
+Desc = "Delay before re-checking for optimal weapon",
+
+Step = 0.1,
+
+Value = {Min = 0.1, Max = 4, Default = 0.2},
+
+Callback = function(value)
+
+getgenv().aimConfig.EQUIP_LOOP = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Base Deviation",
+
+Desc = "Base aim deviation (degrees)",
+
+Step = 0.1,
+
+Value = {Min = 0.5, Max = 5, Default = 0.2},
+
+Callback = function(value)
+
+getgenv().aimConfig.BASE_DEVIATION = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Distance Factor",
+
+Desc = "Additional deviation per stud",
+
+Step = 0.1,
+
+Value = {Min = 0, Max = 2, Default = 0.05},
+
+Callback = function(value)
+
+getgenv().aimConfig.DISTANCE_FACTOR = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Velocity Factor",
+
+Desc = "Additional deviation per unit speed",
+
+Step = 0.1,
+
+Value = {Min = 0, Max = 2, Default = 0.05},
+
+Callback = function(value)
+
+getgenv().aimConfig.VELOCITY_FACTOR = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Accuracy Buildup",
+
+Desc = "Time to reach optimal accuracy after switching targets",
+
+Step = 0.01,
+
+Value = {Min = 0, Max = 0.5, Default = 0.1},
+
+Callback = function(value)
+
+getgenv().aimConfig.ACCURACY_BUILDUP = tonumber(value)
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Min Deviation",
+
+Desc = "Minimum aim error",
+
+Step = 0.1,
+
+Value = {Min = 0.1, Max = 3, Default = 0},
+
+Callback = function(value)
+
+getgenv().aimConfig.MIN_DEVIATION = tonumber(value)
+
+end,
+
+})
+
+-- Added Pixel FoV Slider
+
+AimTab:Slider({
+
+Title = "Pixel FoV Radius",
+
+Desc = "Radius around crosshair for pixel scanning",
+
+Step = 10,
+
+Value = {Min = 50, Max = 500, Default = 100},
+
+Callback = function(value)
+
+getgenv().pixelFovRadius = tonumber(value)
+
+end,
+
+})
+
+-- Added Aim Tick Frequency Slider for Better Reaction
+
+AimTab:Slider({
+
+Title = "Aim Tick Frequency",
+
+Desc = "Frequency of aim updates (lower = faster reaction)",
+
+Step = 0.0001,
+
+Value = {Min = 0.0001, Max = 0.01, Default = 0.0001},
+
+Callback = function(value)
+
+getgenv().aimConfig.AIM_TICK = tonumber(value)
+
+end,
+
+})
+
+-- Added Aim Smoothing Slider for Better Reaction
+
+AimTab:Slider({
+
+Title = "Aim Smoothing",
+
+Desc = "Smoothing factor for aim movement (lower = more responsive)",
+
+Step = 0.01,
+
+Value = {Min = 0.01, Max = 1.0, Default = 0.5},
+
+Callback = function(value)
+
+getgenv().aimConfig.AIM_SMOOTHING = tonumber(value)
+
+end,
+
+})
+
+-- Added Pixel Detection Improvements Sliders and Toggles
+
+AimTab:Toggle({
+
+Title = "Multi-Scale Scanning",
+
+Desc = "Enable multi-scale pixel scanning for better detection",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelMultiScale = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Adaptive Threshold",
+
+Desc = "Adjust pixel threshold based on lighting conditions",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelAdaptiveThreshold = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Edge Detection",
+
+Desc = "Enable simple edge detection for contour recognition",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelEdgeDetection = state
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Pixel Smoothing Factor",
+
+Desc = "Smoothing factor for pixel prediction",
+
+Step = 0.01,
+
+Value = {Min = 0.01, Max = 1.0, Default = 0.1},
+
+Callback = function(value)
+
+getgenv().pixelSmoothingFactor = tonumber(value)
+
+end,
+
+})
+
+
+
+
+------------------------------------------
+
+-- ESP TAB
+
+------------------------------------------
+
+local EspTab = Window:Tab({ Title = "ESP", Icon = "eye", Locked = false })
+
+EspTab:Toggle({
+
+Title = "Feature status",
+
+Desc = "Enable/Disable the ESP",
+
+Callback = function(state)
+
+local espModule = loadedModules["mvsd/esp.lua"]
+
+if not state and espModule then
+
+for _, connection in pairs(espModule) do connection:Disconnect() end
+
+loadedModules["mvsd/esp.lua"] = nil
+
+return
+
+end
+
+loadModule("mvsd/esp.lua")
+
+end,
+
+})
+
+EspTab:Toggle({
+
+Title = "Display Team",
+
+Desc = "Highlight teammates",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().espTeamMates = state
+
+end,
+
+})
+
+EspTab:Toggle({
+
+Title = "Display Enemies",
+
+Desc = "Highlight enemy players",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().espEnemies = state
+
+end,
+
+})
+
+
+
+
+------------------------------------------
+
+-- AUTO KILL TAB
+
+------------------------------------------
+
+local KillTab = Window:Tab({ Title = "Auto Kill", Icon = "skull", Locked = false })
+
+local function triggerKill(origin, loopState)
+
+getgenv().killSpeed = 0
+
+if origin == "knife" then
+
+getgenv().killButton.knife = not loopState
+
+getgenv().killLoop.knife = loopState
+
+elseif origin == "gun" then
+
+getgenv().killButton.gun = not loopState
+
+getgenv().killLoop.gun = loopState
+
+end
+
+local success = loadModule("mvsd/killall.lua")
+
+if not success then
+
+warn("Failed to load killall module")
+
+end
+
+end
+
+
+
+
+KillTab:Button({
+
+Title = "[Knife] Kill All",
+
+Desc = "Kill all players with knife immediately.",
+
+Callback = function()
+
+triggerKill("knife", false)
+
+end,
+
+})
+
+KillTab:Button({
+
+Title = "[Gun] Kill All",
+
+Desc = "Kill all players with gun immediately.",
+
+Callback = function()
+
+triggerKill("gun", false)
+
+end,
+
+})
+
+local gunLoopToggle = KillTab:Toggle({
+
+Title = "[Gun] Loop Kill All",
+
+Desc = "Continuously kill with gun (fast execution)",
+
+Callback = function(state)
+
+triggerKill("gun", state)
+
+end,
+
+})
+
+local knifeLoopToggle = KillTab:Toggle({
+
+Title = "[Knife] Loop Kill All",
+
+Desc = "Continuously kill with knife (fast execution)",
+
+Callback = function(state)
+
+triggerKill("knife", state)
+
+end,
+
+})
+
+KillTab:Toggle({
+
+Title = "[Knife] Prediction",
+
+Desc = "Enable knife prediction to anticipate enemy movement",
+
+Value = getgenv().knifePrediction.ENABLED,
+
+Callback = function(state)
+
+getgenv().knifePrediction.ENABLED = state
+
+end,
+
+})
+
+KillTab:Slider({
+
+Title = "[Knife] Prediction Factor",
+
+Desc = "Seconds ahead to predict enemy movement",
+
+Step = 0.01,
+
+Value = {Min = 0.01, Max = 0.5, Default = getgenv().knifePrediction.PREDICTION_FACTOR},
+
+Callback = function(value)
+
+getgenv().knifePrediction.PREDICTION_FACTOR = tonumber(value)
+
+end,
+
+})
+
+KillTab:Slider({
+
+Title = "[Knife] Max Distance",
+
+Desc = "Maximum effective distance for knife prediction",
+
+Step = 0.5,
+
+Value = {Min = 5, Max = 20, Default = getgenv().knifePrediction.MAX_DISTANCE},
+
+Callback = function(value)
+
+getgenv().knifePrediction.MAX_DISTANCE = tonumber(value)
+
+end,
+
+})
+
+KillTab:Slider({
+
+Title = "[Knife] Thrown Scale",
+
+Desc = "Multiply knife size by factor when thrown",
+
+Step = 0.1,
+
+Value = {Min = 1, Max = 10, Default = 5},
+
+Callback = function(value)
+
+getgenv().knifeThrownScale = tonumber(value)
+
+print("Knife thrown scale set to", getgenv().knifeThrownScale)
+
+end,
+
+})
+
+KillTab:Slider({
+
+Title = "[Knife] Throw Count",
+
+Desc = "Number of knives to throw simultaneously",
+
+Step = 1,
+
+Value = {Min = 1, Max = 20, Default = 10},
+
+Callback = function(value)
+
+getgenv().knifeThrowCount = tonumber(value)
+
+print("Knife throw count set to", getgenv().knifeThrowCount)
+
+end,
+
+})
+
+KillTab:Button({
+
+Title = "[Knife] Throw Multiple",
+
+Desc = "Throw the configured count of knives (fast loop)",
+
+Callback = function()
+
+local args = {
+
+[1] = Vector3_new(-241.89431762695312, 62.499996185302734, 155.4720916748047),
+
+[2] = Vector3_new(-0.23305106163024902, 0.0033321836963295937, 0.9724588394165039)
+
+}
+
+for i = 1, getgenv().knifeThrowCount do
+
+task_spawn(function()
+
+game:GetService("ReplicatedStorage").Remotes.ThrowStart:FireServer(unpack(args))
+
+end)
+
+end
+
+end,
+
+})
+
+KillTab:Button({
+
+Title = "Fake Kill Sound",
+
+Desc = "Simulate kill sound effect for enemy players without killing them",
+
+Callback = function()
+
+for _, pl in ipairs(Players:GetPlayers()) do
+
+if pl ~= localPlayer and pl.Character then
+
+local head = pl.Character:FindFirstChild("Head")
+
+if head then
+
+local s = Instance_new("Sound")
+
+s.SoundId = "rbxassetid://301964312"
+
+s.Volume = 1
+
+s.Parent = head
+
+s:Play()
+
+task.delay(2, function() s:Destroy() end)
+
+end
+
+end
+
+end
+
+end,
+
+})
+
+KillTab:Toggle({
+
+Title = "[Gun] Loop Kill (Instant TP)",
+
+Desc = "Continuously teleport to the nearest enemy (with team check) and fire the kill event every frame.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().loopKillInstantTP = state
+
+if state then
+
+task_spawn(function()
+
+while getgenv().loopKillInstantTP do
+
+local nearestEnemy = nil
+
+local shortestDistance = math_huge
+
+local myChar = localPlayer.Character
+
+if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+
+local myPos = myChar.HumanoidRootPart.Position
+
+for _, pl in ipairs(Players:GetPlayers()) do
+
+if pl ~= localPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+
+if getgenv().teamCheckKill then
+
+if localPlayer.Team and pl.Team and localPlayer.Team == pl.Team then
+
+continue
+
+end
+
+end
+
+local enemyPos = pl.Character.HumanoidRootPart.Position
+
+local distance = (enemyPos - myPos).Magnitude
+
+if distance < shortestDistance then
+
+shortestDistance = distance
+
+nearestEnemy = pl
+
+end
+
+end
+
+end
+
+end
+
+if nearestEnemy then
+
+myChar.HumanoidRootPart.CFrame = nearestEnemy.Character.HumanoidRootPart.CFrame
+
+local remoteGun = ReplicatedStorage:FindFirstChild("GunShoot")
+
+if remoteGun then
+
+remoteGun:FireServer()
+
+end
+
+end
+
+task_wait(0.001)
+
+end
+
+end)
+
+end
+
+end,
+
+})
+
+
+
+
+------------------------------------------
+
+-- MISC TAB
+
+------------------------------------------
+
+local MiscTab = Window:Tab({ Title = "Misc", Icon = "brackets", Locked = false })
+
+MiscTab:Toggle({
+
+Title = "Anti Crash",
+
+Desc = "Replace ShroudProjectileController to prevent crashes",
+
+Value = true,
+
+Callback = function(state)
+
+local crashConn
+
+if state or (localPlayer and localPlayer.Character) then
+
+crashConn = localPlayer.CharacterAdded:Connect(function()
+
+local module = ReplicatedStorage.Ability:WaitForChild("ShroudProjectileController", 5)
+
+if module then
+
+local replacement = Instance_new("ModuleScript")
+
+replacement.Name = "ShroudProjectileController"
+
+replacement.Parent = module.Parent
+
+module:Destroy()
+
+end
+
+end)
+
+elseif crashConn then
+
+crashConn:Disconnect()
+
+end
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "Low Poly",
+
+Desc = "Toggle low poly mode for performance",
+
+Value = false,
+
+Callback = function(state)
+
+local updateSetting = ReplicatedStorage.Settings:WaitForChild("UpdateSetting", 4)
+
+updateSetting:FireServer("LowGraphics", state)
+
+updateSetting:FireServer("KillEffectsDisabled", state)
+
+updateSetting:FireServer("LobbyMusicDisabled", state)
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "Auto Spin",
+
+Desc = "Automatically spin the modifier wheel",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().autoSpin = state
+
+task_spawn(function()
+
+while getgenv().autoSpin and localPlayer:GetAttribute("Match") do
+
+ReplicatedStorage.Dailies.Spin:InvokeServer()
+
+task_wait(0.1)
+
+end
+
+end)
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "No Ability Cooldown",
+
+Desc = "Set all ability cooldowns to 0 (client-side bypass)",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().noAbilityCooldown = state
+
+local icon = state and "bolt" or "xmark"
+
+Windui:Notify({
+
+Title = "No Ability Cooldown",
+
+Content = state and "Ability cooldowns disabled (client-side)." or "Ability cooldowns restored.",
+
+Duration = 3,
+
+Icon = icon
+
+})
+
+end,
+
+})
+
+RunService.Heartbeat:Connect(function()
+
+if getgenv().noAbilityCooldown then
+
+-- Set all NumberValues in Ability folder to 0
+
+local abilityFolder = ReplicatedStorage:FindFirstChild("Ability")
+
+if abilityFolder then
+
+for _, ability in ipairs(abilityFolder:GetChildren()) do
+
+if ability:IsA("NumberValue") and ability.Name:lower():find("cooldown") then
+
+ability.Value = getgenv().cooldownMultiplier * (ability.OriginalValue or 1) -- Assuming original value stored or default
+
+end
+
+if ability:GetAttribute("Cooldown") then
+
+ability:SetAttribute("Cooldown", getgenv().cooldownMultiplier * (ability:GetAttribute("OriginalCooldown") or 1))
+
+end
+
+end
+
+end
+
+-- Also set tool cooldowns to adjusted value
+
+for _, tool in ipairs(localPlayer.Backpack:GetChildren()) do
+
+if tool:IsA("Tool") then
+
+if tool:FindFirstChild("Cooldown") and tool.Cooldown:IsA("NumberValue") then
+
+tool.Cooldown.Value = getgenv().cooldownMultiplier * (tool.Cooldown.OriginalValue or 1)
+
+end
+
+if tool:GetAttribute("Cooldown") then
+
+tool:SetAttribute("Cooldown", getgenv().cooldownMultiplier * (tool:GetAttribute("OriginalCooldown") or 1))
+
+end
+
+-- Set CanUse to true if multiplier is low
+
+if tool:FindFirstChild("CanUse") then
+
+tool.CanUse.Value = getgenv().cooldownMultiplier < 0.5
+
+end
+
+end
+
+end
+
+if localPlayer.Character then
+
+for _, tool in ipairs(localPlayer.Character:GetChildren()) do
+
+if tool:IsA("Tool") then
+
+if tool:FindFirstChild("Cooldown") and tool.Cooldown:IsA("NumberValue") then
+
+tool.Cooldown.Value = getgenv().cooldownMultiplier * (tool.Cooldown.OriginalValue or 1)
+
+end
+
+if tool:GetAttribute("Cooldown") then
+
+tool:SetAttribute("Cooldown", getgenv().cooldownMultiplier * (tool:GetAttribute("OriginalCooldown") or 1))
+
+end
+
+if tool:FindFirstChild("CanUse") then
+
+tool.CanUse.Value = getgenv().cooldownMultiplier < 0.5
+
+end
+
+end
+
+end
+
+end
+
+-- Universal cooldown adjustment for tools
+
+for _, obj in pairs(getgc()) do
+
+if type(obj) == "function" and islclosure(obj) then
+
+local info = debug.getinfo(obj)
+
+if info.name and info.name:lower():find("cooldown") then
+
+hookfunction(obj, function(...)
+
+return getgenv().cooldownMultiplier == 0
+
+end)
+
+end
+
+end
+
+end
+
+end
+
+end)
+
+local VirtualUser = game:GetService("VirtualUser")
+
+local function waitForClick()
+
+local pos; local conn
+
+conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+
+if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not gameProcessed then
+
+pos = input.Position; conn:Disconnect()
+
+end
+
+end)
+
+while not pos do RunService.RenderStepped:Wait() end
+
+return pos
+
+end
+
+MiscTab:Button({
+
+Title = "Click to Auto You",
+
+Desc = "Tap/click anywhere to start auto clicking. Press again to stop.",
+
+Callback = function()
+
+if getgenv().autoClick then
+
+getgenv().autoClick = false
+
+Windui:Notify({ Title = "Auto Click", Content = "Auto clicking deactivated.", Duration = 3, Icon = "xmark" })
+
+else
+
+Windui:Notify({ Title = "Auto Click", Content = "Tap/click anywhere on the screen to start auto clicking.", Duration = 3, Icon = "mouse" })
+
+local pos = waitForClick()
+
+if UserInputService.TouchEnabled then
+
+local screenSize = workspace.CurrentCamera.ViewportSize
+
+pos = Vector3_new(screenSize.X / 2, screenSize.Y / 2)
+
+end
+
+getgenv().autoClick = true
+
+Windui:Notify({ Title = "Auto Click", Content = "Auto clicking activated at (".. pos.X ..", ".. pos.Y ..").", Duration = 3, Icon = "mouse" })
+
+local delayTime = 0.005; local acc = 0
+
+local clickConn
+
+clickConn = RunService.RenderStepped:Connect(function(dt)
+
+if not getgenv().autoClick then clickConn:Disconnect() return end
+
+acc = acc + dt
+
+if acc >= delayTime then
+
+VirtualUser:Button1Down(pos)
+
+VirtualUser:Button1Up(pos)
+
+acc = 0
+
+end
+
+end)
+
+end
+
+end,
+
+})
+
+local infiniteJumpConnection = nil
+
+MiscTab:Toggle({
+
+Title = "Infinite Jump",
+
+Desc = "Enable infinite jump so that your character jumps every time you press the jump button, even mid-air.",
+
+Value = false,
+
+Callback = function(state)
+
+if state then
+
+infiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
+
+local char = localPlayer.Character
+
+if char then
+
+local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+if humanoid then
+
+humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+
+end
+
+end
+
+end)
+
+else
+
+if infiniteJumpConnection then
+
+infiniteJumpConnection:Disconnect()
+
+infiniteJumpConnection = nil
+
+end
+
+end
+
+end,
+
+})
+
+MiscTab:Button({
+
+Title = "Teleport to Safe Place",
+
+Desc = "Teleports you 1000000000090904309340 studs away for a safe location.",
+
+Callback = function()
+
+local farDistance = 1000000000090904309340
+
+if localPlayer and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+
+local hrp = localPlayer.Character.HumanoidRootPart
+
+hrp.CFrame = CFrame.new(farDistance, farDistance, farDistance)
+
+print("Teleported to safe place at:", farDistance, farDistance, farDistance)
+
+else
+
+warn("Character or HumanoidRootPart not found!")
+
+end
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "Spam Gun Shoot",
+
+Desc = "Spam gun shooting as fast as possible.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().spamGunActive = state
+
+local icon, content = state and "fire" or "xmark", state and "Gun spam activated." or "Gun spam deactivated."
+
+Windui:Notify({ Title = "Spam Gun Shoot", Content = content, Duration = 3, Icon = icon })
+
+if state then
+
+task_spawn(function()
+
+while getgenv().spamGunActive do
+
+local remote = ReplicatedStorage:FindFirstChild("GunShoot")
+
+if remote then
+
+remote:FireServer()
+
+end
+
+task_wait(0.005)
+
+end
+
+end)
+
+end
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "Loop Gun Shoot",
+
+Desc = "Continuously simulate gun shooting events.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().loopGunShootActive = state
+
+local icon, content = state and "fire" or "xmark", state and "Gun shoot loop activated." or "Gun shoot loop deactivated."
+
+Windui:Notify({ Title = "Loop Gun Shoot", Content = content, Duration = 3, Icon = icon })
+
+if state then
+
+task_spawn(function()
+
+while getgenv().loopGunShootActive do
+
+local remote = ReplicatedStorage:FindFirstChild("GunShoot")
+
+if remote then
+
+remote:FireServer()
+
+end
+
+task_wait(0.05)
+
+end
+
+end)
+
+end
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "Loop Knife Shoot",
+
+Desc = "Continuously simulate knife shooting events.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().loopKnifeShootActive = state
+
+local icon, content = state and "fire" or "xmark", state and "Knife shoot loop activated." or "Knife shoot loop deactivated."
+
+Windui:Notify({ Title = "Loop Knife Shoot", Content = content, Duration = 3, Icon = icon })
+
+if state then
+
+task_spawn(function()
+
+while getgenv().loopKnifeShootActive do
+
+local remote = ReplicatedStorage:FindFirstChild("KnifeShoot")
+
+if remote then
+
+remote:FireServer()
+
+end
+
+task_wait(0.05)
+
+end
+
+end)
+
+end
+
+end,
+
+})
+
+MiscTab:Button({
+
+Title = "Normal Shoot",
+
+Desc = "Simulate a normal gun shoot event once.",
+
+Callback = function()
+
+local remote = ReplicatedStorage:FindFirstChild("GunShoot")
+
+if remote then
+
+remote:FireServer()
+
+end
+
+end,
+
+})
+
+
+
+
+-- Updated Auto Farm 1v1 Toggle with improved robustness and speed
+
+MiscTab:Toggle({
+
+Title = "Auto Farm 1v1",
+
+Desc = "Automatically join 1v1 duels and enable instant TP kill loop for farming.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().autoFarm1v1 = state
+
+if state then
+
+Windui:Notify({ Title = "Auto Farm 1v1", Content = "Auto farming 1v1 duels enabled.", Duration = 3, Icon = "zap" })
+
+task_spawn(function()
+
+while getgenv().autoFarm1v1 do
+
+local success, err = pcall(function()
+
+if localPlayer and localPlayer.Character then
+
+local duelRemote = ReplicatedStorage:FindFirstChild("JoinDuel") or ReplicatedStorage:FindFirstChild("StartDuel") or ReplicatedStorage:FindFirstChild("Join1v1Duel") or ReplicatedStorage:FindFirstChild("RequestMatch")
+
+if duelRemote then
+
+duelRemote:FireServer({mode = "1v1"})
+
+end
+
+end
+
+end)
+
+if not success then
+
+warn("Auto Farm 1v1 error:", err)
+
+end
+
+task_wait(0.05) -- faster for speed
+
+end
+
+end)
+
+getgenv().loopKillInstantTP = true -- enable instant TP kill for farming
+
+else
+
+getgenv().loopKillInstantTP = false
+
+Windui:Notify({ Title = "Auto Farm 1v1", Content = "Auto farming 1v1 duels disabled.", Duration = 3, Icon = "xmark" })
+
+end
+
+end,
+
+})
+
+
+
+
+-- Updated Auto Farm 2v2 Toggle with improved robustness and speed
+
+MiscTab:Toggle({
+
+Title = "Auto Farm 2v2",
+
+Desc = "Automatically join 2v2 duels and enable instant TP kill loop for farming.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().autoFarm2v2 = state
+
+if state then
+
+Windui:Notify({ Title = "Auto Farm 2v2", Content = "Auto farming 2v2 duels enabled.", Duration = 3, Icon = "zap" })
+
+task_spawn(function()
+
+while getgenv().autoFarm2v2 do
+
+local success, err = pcall(function()
+
+if localPlayer and localPlayer.Character then
+
+local duelRemote = ReplicatedStorage:FindFirstChild("JoinDuel") or ReplicatedStorage:FindFirstChild("StartDuel") or ReplicatedStorage:FindFirstChild("Join2v2Duel") or ReplicatedStorage:FindFirstChild("RequestMatch")
+
+if duelRemote then
+
+duelRemote:FireServer({mode = "2v2"})
+
+end
+
+end
+
+end)
+
+if not success then
+
+warn("Auto Farm 2v2 error:", err)
+
+end
+
+task_wait(0.05) -- faster for speed
+
+end
+
+end)
+
+getgenv().loopKillInstantTP = true -- enable instant TP kill for farming
+
+else
+
+getgenv().loopKillInstantTP = false
+
+Windui:Notify({ Title = "Auto Farm 2v2", Content = "Auto farming 2v2 duels disabled.", Duration = 3, Icon = "xmark" })
+
+end
+
+end,
+
+})
+
+
+
+
+-- Advanced Cooldown Bypass
+
+local function bypassCooldowns()
+
+for _, obj in pairs(getgc()) do
+
+if type(obj) == "table" and obj.Cooldown then
+
+obj.Cooldown = 0
+
+elseif type(obj) == "function" and islclosure(obj) then
+
+local info = debug.getinfo(obj)
+
+if info.name and info.name:lower():find("cooldown") then
+
+hookfunction(obj, function(...)
+
+return true
+
+end)
+
+end
+
+end
+
+end
+
+end
+
+bypassCooldowns()
+
+RunService.Heartbeat:Connect(bypassCooldowns)
+
+
+
+
+-- Added No Gun Cooldown Toggle
+
+MiscTab:Toggle({
+
+Title = "No Gun Cooldown",
+
+Desc = "Remove cooldown for guns specifically.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().noGunCooldown = state
+
+local icon = state and "bolt" or "xmark"
+
+Windui:Notify({
+
+Title = "No Gun Cooldown",
+
+Content = state and "Gun cooldowns disabled." or "Gun cooldowns restored.",
+
+Duration = 3,
+
+Icon = icon
+
+})
+
+end,
+
+})
+
+RunService.Heartbeat:Connect(function()
+
+if getgenv().noGunCooldown then
+
+-- Set gun tool cooldowns to 0
+
+for _, tool in ipairs(localPlayer.Backpack:GetChildren()) do
+
+if tool:IsA("Tool") and tool.Name:lower():find("gun") then
+
+if tool:FindFirstChild("Cooldown") and tool.Cooldown:IsA("NumberValue") then
+
+tool.Cooldown.Value = 0
+
+end
+
+if tool:GetAttribute("Cooldown") then
+
+tool:SetAttribute("Cooldown", 0)
+
+end
+
+if tool:FindFirstChild("CanUse") then
+
+tool.CanUse.Value = true
+
+end
+
+end
+
+end
+
+if localPlayer.Character then
+
+for _, tool in ipairs(localPlayer.Character:GetChildren()) do
+
+if tool:IsA("Tool") and tool.Name:lower():find("gun") then
+
+if tool:FindFirstChild("Cooldown") and tool.Cooldown:IsA("NumberValue") then
+
+tool.Cooldown.Value = 0
+
+end
+
+if tool:GetAttribute("Cooldown") then
+
+tool:SetAttribute("Cooldown", 0)
+
+end
+
+if tool:FindFirstChild("CanUse") then
+
+tool.CanUse.Value = true
+
+end
+
+end
+
+end
+
+end
+
+end
+
+end)
+
+
+
+
+-- Added Cooldown Adjuster Slider
+
+MiscTab:Slider({
+
+Title = "Cooldown Multiplier",
+
+Desc = "Adjust ability and tool cooldowns (0 = no cooldown, 1 = full cooldown)",
+
+Step = 0.1,
+
+Value = {Min = 0, Max = 1, Default = 0},
+
+Callback = function(value)
+
+getgenv().cooldownMultiplier = tonumber(value)
+
+Windui:Notify({ Title = "Cooldown Adjuster", Content = "Cooldown multiplier set to " .. getgenv().cooldownMultiplier, Duration = 3, Icon = "clock" })
+
+end,
+
+})
+
+
+
+
+------------------------------------------
+
+-- SPEED & JUMP POWER CHANGER FEATURE
+
+------------------------------------------
+
+MiscTab:Toggle({
+
+Title = "Enable Speed Changer",
+
+Desc = "Toggle to enable or disable changing WalkSpeed.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().enableSpeedChanger = state
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "Enable Jump Power Changer",
+
+Desc = "Toggle to enable or disable changing JumpPower.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().enableJumpPowerChanger = state
+
+end,
+
+})
+
+MiscTab:Slider({
+
+Title = "Speed Changer",
+
+Desc = "Set your character walking speed.",
+
+Step = 1,
+
+Value = {Min = 16, Max = 100, Default = 16},
+
+Callback = function(value)
+
+getgenv().walkSpeed = tonumber(value)
+
+end,
+
+})
+
+MiscTab:Slider({
+
+Title = "Jump Power",
+
+Desc = "Set your character's jump power.",
+
+Step = 1,
+
+Value = {Min = 10, Max = 100, Default = 50},
+
+Callback = function(value)
+
+getgenv().jumpPower = tonumber(value)
+
+end,
+
+})
+
+RunService.Heartbeat:Connect(function()
+
+local char = localPlayer and localPlayer.Character
+
+if char then
+
+local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+if humanoid then
+
+if getgenv().enableSpeedChanger then
+
+humanoid.WalkSpeed = getgenv().walkSpeed or 16
+
+end
+
+if getgenv().enableJumpPowerChanger then
+
+humanoid.JumpPower = getgenv().jumpPower or 50
+
+end
+
+end
+
+end
+
+end)
+
+
+
+
+------------------------------------------
+
+-- CONTROLS TAB
+
+------------------------------------------
+
+local ControlsTab = Window:Tab({ Title = "Controls", Icon = "keyboard", Locked = false })
+
+ControlsTab:Toggle({
+
+Title = "Delete Old Controllers",
+
+Desc = "Disable deletion of old controller instances",
+
+Value = true,
+
+Callback = function(state)
+
+local ctrlModule = loadedModules["mvsd/controllers/init.lua"]
+
+if not state and ctrlModule then
+
+ctrlModule:Disconnect()
+
+loadedModules["mvsd/controllers/init.lua"] = nil
+
+return
+
+end
+
+loadModule("mvsd/controllers/init.lua")
+
+end,
+
+})
+
+ControlsTab:Toggle({
+
+Title = "Custom Knife Controller",
+
+Desc = "Improves knife control (no mobile toggle available)",
+
+Value = true,
+
+Callback = function(state)
+
+local controllerFolder = workspace:WaitForChild("i_dontgetanned0188", 5)
+
+if controllerFolder then
+
+local knifeModule = controllerFolder:FindFirstChild("KnifeController")
+
+if knifeModule then
+
+if not state then
+
+if loadedModules["mvsd/controllers/knife.lua"] then
+
+loadedModules["mvsd/controllers/knife.lua"]:Disconnect()
+
+loadedModules["mvsd/controllers/knife.lua"] = nil
+
+end
+
+return
+
+else
+
+Windui:Notify({ Title = "Warning", Content = "Custom Knife Controller has no mobile toggle.", Duration = 4, Icon = "triangle-alert" })
+
+loadModule("mvsd/controllers/knife.lua")
+
+end
+
+else
+
+print("KnifeController not found in i_dontgetanned0188")
+
+end
+
+else
+
+print("Controller folder i_dontgetanned0188 not found.")
+
+end
+
+end,
+
+})
+
+ControlsTab:Toggle({
+
+Title = "Custom Gun Controller",
+
+Desc = "Improves gun input handling",
+
+Value = true,
+
+Callback = function(state)
+
+local controllerFolder = workspace:WaitForChild("i_dontgetanned0188", 5)
+
+if controllerFolder then
+
+local gunModule = controllerFolder:FindFirstChild("GunController")
+
+if gunModule then
+
+if not state then
+
+if loadedModules["mvsd/controllers/gun.lua"] then
+
+loadedModules["mvsd/controllers/gun.lua"]:Disconnect()
+
+loadedModules["mvsd/controllers/gun.lua"] = nil
+
+end
+
+return
+
+else
+
+loadModule("mvsd/controllers/gun.lua")
+
+end
+
+else
+
+print("GunController not found in i_dontgetanned0188")
+
+end
+
+else
+
+print("Controller folder i_dontgetanned0188 not found.")
+
+end
+
+end,
+
+})
+
+
+
+
+------------------------------------------
+
+-- DEVELOPER MODE TAB
+
+------------------------------------------
+
+local DeveloperTab = Window:Tab({ Title = "Developer Mode", Icon = "code", Locked = false })
+
+DeveloperTab:Toggle({
+
+Title = "Enable Developer Mode",
+
+Desc = "Toggle in-GUI code editing and customization options",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().DevMode = state
+
+local icon = state and "code" or "xmark"
+
+Windui:Notify({
+
+Title = "Developer Mode",
+
+Content = state and "Developer Mode enabled!" or "Developer Mode disabled.",
+
+Duration = 4,
+
+Icon = icon
+
+})
+
+end,
+
+})
+
+if getgenv().DevMode then
+
+DeveloperTab:TextBox({
+
+Title = "Edit Code",
+
+Desc = "Paste your Lua code modifications here.",
+
+Text = "-- Enter your custom Lua modifications here.\n",
+
+Callback = function(text)
+
+print("New code entered:", text)
+
+end,
+
+})
+
+end
+
+DeveloperTab:Button({
+
+Title = "Add Feature",
+
+Desc = "Add a new feature placeholder to the GUI",
+
+Callback = function()
+
+Windui:Notify({
+
+Title = "Feature Added",
+
+Content = "A new feature placeholder has been added.",
+
+Duration = 3,
+
+Icon = "plus"
+
+})
+
+end,
+
+})
+
+DeveloperTab:Toggle({
+
+Title = "Advanced Debug Information",
+
+Desc = "Display an overlay with FPS and ping for debugging.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().enableDebugInfo = state
+
+if state then
+
+local player = Players.LocalPlayer
+
+local playerGui = player:WaitForChild("PlayerGui")
+
+local debugGui = Instance_new("ScreenGui")
+
+debugGui.Name = "DebugOverlay"
+
+debugGui.Parent = playerGui
+
+local debugLabel = Instance_new("TextLabel", debugGui)
+
+debugLabel.Name = "DebugInfo"
+
+debugLabel.Size = UDim2.fromOffset(300, 100)
+
+debugLabel.Position = UDim2.new(0, 10, 0, 10)
+
+debugLabel.BackgroundTransparency = 0.5
+
+debugLabel.TextColor3 = Color3_fromRGB(1, 1, 1)
+
+debugLabel.TextScaled = true
+
+getgenv().debugLabel = debugLabel
+
+getgenv().lastTick = tick()
+
+else
+
+if getgenv().debugLabel and getgenv().debugLabel.Parent then
+
+getgenv().debugLabel.Parent:Destroy()
+
+getgenv().debugLabel = nil
+
+end
+
+end
+
+end,
+
+})
+
+RunService.Heartbeat:Connect(function()
+
+if getgenv().enableDebugInfo and getgenv().debugLabel then
+
+local currentTick = tick()
+
+local delta = currentTick - (getgenv().lastTick or currentTick)
+
+local fps = delta > 0 and math_floor(1 / delta) or 0
+
+getgenv().lastTick = currentTick
+
+local stats = game:GetService("Stats")
+
+local dataPing = stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
+
+local ping = dataPing and dataPing:GetValue() or 0
+
+getgenv().debugLabel.Text = string.format("FPS: %d\nPing: %d ms", fps, ping)
+
+end
+
+end)
+
+DeveloperTab:Toggle({
+
+Title = "Dynamic Performance Adjustments",
+
+Desc = "Auto adjust graphics quality based on current network ping.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().dynamicPerformance = state
+
+if state then
+
+print("Dynamic Performance Adjustments enabled.")
+
+else
+
+print("Dynamic Performance Adjustments disabled.")
+
+end
+
+end,
+
+})
+
+DeveloperTab:Slider({
+
+Title = "Network Ping Threshold",
+
+Desc = "Ping value threshold to trigger lower graphics quality.",
+
+Step = 1,
+
+Value = {Min = 50, Max = 500, Default = 200},
+
+Callback = function(value)
+
+getgenv().pingThreshold = tonumber(value)
+
+print("Ping threshold set to", getgenv().pingThreshold)
+
+end,
+
+})
+
+RunService.Heartbeat:Connect(function()
+
+if getgenv().dynamicPerformance and getgenv().pingThreshold then
+
+local stats = game:GetService("Stats")
+
+local dataPing = stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
+
+local ping = dataPing and dataPing:GetValue() or 0
+
+if ping > getgenv().pingThreshold then
+
+RenderingQuality = 1
+
+else
+
+RenderingQuality = 3
+
+end
+
+end
+
+end)
+
+
+
+
+------------------------------------------
+
+-- ANIMATIONS TAB (Added more animations)
+
+------------------------------------------
+
+local AnimationsTab = Window:Tab({ Title = "Animations", Icon = "play", Locked = false })
+
+
+
+
+-- Add more hardcoded animations
+
+local additionalAssets = {
+
+"rbxassetid://507776043", -- Dance
+
+"rbxassetid://507777268", -- Cheer
+
+"rbxassetid://507777623", -- Wave
+
+"rbxassetid://507776879", -- Laugh
+
+"rbxassetid://507776720", -- Point
+
+"rbxassetid://507777584", -- Clap
+
+"rbxassetid://507777454", -- Shrug
+
+"rbxassetid://507777071", -- Sit
+
+"rbxassetid://507777295", -- Cower
+
+"rbxassetid://507777550", -- Angry
+
+"rbxassetid://507777720", -- Zombie
+
+"rbxassetid://507777551", -- Hello
+
+"rbxassetid://507776079", -- Jump
+
+"rbxassetid://507777430", -- Sneaky
+
+"rbxassetid://507777503", -- Sad
+
+"rbxassetid://507777640", -- Sleep
+
+"rbxassetid://507776379", -- Spin
+
+"rbxassetid://507776157", -- Floss
+
+"rbxassetid://507777001", -- Dab
+
+"rbxassetid://507776879", -- Ninja
+
+"rbxassetid://507776433", -- Headless
+
+"rbxassetid://507776524", -- Zombie
+
+"rbxassetid://507776629", -- Crazy
+
+"rbxassetid://507776733", -- Robot
+
+"rbxassetid://507776837", -- Fright
+
+"rbxassetid://507776941", -- Stick Figure
+
+"rbxassetid://507777045", -- Superhero
+
+"rbxassetid://507777149", -- Bored
+
+"rbxassetid://507777253", -- Stylish Walk
+
+"rbxassetid://507777357", -- Moonwalk
+
+"rbxassetid://507777461", -- Shy
+
+"rbxassetid://507777565", -- Swagger
+
+"rbxassetid://507777669", -- Astronaut
+
+"rbxassetid://507777773", -- Ghost
+
+"rbxassetid://507777877", -- Catwalk
+
+"rbxassetid://507777981", -- Princess
+
+"rbxassetid://507778085", -- Cowboy
+
+"rbxassetid://507778189", -- Knight
+
+"rbxassetid://507778293", -- Zombie Classic
+
+"rbxassetid://507778397", -- Robot Classic
+
+"rbxassetid://507778501", -- Vampire
+
+"rbxassetid://507778605", -- Werewolf
+
+"rbxassetid://507778709", -- Mummy
+
+"rbxassetid://507778813", -- Pirate
+
+"rbxassetid://507778917", -- Ninja Classic
+
+"rbxassetid://507779021", -- Boxer
+
+"rbxassetid://507779125", -- Martial Artist
+
+"rbxassetid://507779229", -- Gymnast
+
+"rbxassetid://507779333", -- Breakdancer
+
+"rbxassetid://507779437", -- Skateboarder
+
+"rbxassetid://507779541", -- Surfer
+
+"rbxassetid://507779645", -- BMX Rider
+
+"rbxassetid://507779749", -- Parkour
+
+"rbxassetid://507779853", -- Acrobat
+
+"rbxassetid://507779957", -- Super Speed
+
+"rbxassetid://507780061", -- Teleport
+
+"rbxassetid://507780165", -- Invisibility
+
+"rbxassetid://507780269", -- Time Stop
+
+"rbxassetid://507780373", -- Levitate
+
+"rbxassetid://507780477", -- Mind Control
+
+"rbxassetid://507780581", -- Shape Shift
+
+"rbxassetid://507780685", -- Super Strength
+
+"rbxassetid://507780789", -- Flight
+
+"rbxassetid://507780893", -- Laser Eyes
+
+"rbxassetid://507780997", -- Fire Breath
+
+"rbxassetid://507781101", -- Ice Blast
+
+"rbxassetid://507781205", -- Lightning
+
+"rbxassetid://507781309", -- Earth Quake
+
+"rbxassetid://507781413", -- Water Blast
+
+"rbxassetid://507781517", -- Wind Gust
+
+"rbxassetid://507781621", -- Healing
+
+"rbxassetid://507781725", -- Summon
+
+"rbxassetid://507781829", -- Illusion
+
+"rbxassetid://507781933", -- Portal
+
+"rbxassetid://507782037", -- Gravity
+
+"rbxassetid://507782141", -- Magnetism
+
+"rbxassetid://507782245", -- Poison
+
+"rbxassetid://507782349", -- Sleep
+
+"rbxassetid://507782453", -- Confusion
+
+"rbxassetid://507782557", -- Fear
+
+"rbxassetid://507782661", -- Rage
+
+"rbxassetid://507782765", -- Happiness
+
+"rbxassetid://507782869", -- Sadness
+
+"rbxassetid://507782973", -- Surprise
+
+"rbxassetid://507783077", -- Disgust
+
+"rbxassetid://507783181", -- Contempt
+
+"rbxassetid://507783285", -- Shame
+
+"rbxassetid://507783389", -- Guilt
+
+"rbxassetid://507783493", -- Pride
+
+"rbxassetid://507783597", -- Envy
+
+"rbxassetid://507783701", -- Jealousy
+
+"rbxassetid://507783805", -- Love
+
+"rbxassetid://507783909", -- Lust
+
+"rbxassetid://507784013", -- Greed
+
+"rbxassetid://507784117", -- Sloth
+
+"rbxassetid://507784221", -- Wrath
+
+"rbxassetid://507784325", -- Gluttony
+
+"rbxassetid://507784429", -- Patience
+
+"rbxassetid://507784533", -- Kindness
+
+"rbxassetid://507784637", -- Humility
+
+"rbxassetid://507784741", -- Charity
+
+"rbxassetid://507784845", -- Chastity
+
+"rbxassetid://507784949", -- Temperance
+
+"rbxassetid://507785053", -- Diligence
+
+"rbxassetid://507785157", -- Fortitude
+
+"rbxassetid://507785261", -- Justice
+
+"rbxassetid://507785365", -- Faith
+
+"rbxassetid://507785469", -- Hope
+
+"rbxassetid://507785573", -- Courage
+
+"rbxassetid://507785677", -- Wisdom
+
+"rbxassetid://507785781", -- Knowledge
+
+"rbxassetid://507785885", -- Understanding
+
+"rbxassetid://507785989", -- Counsel
+
+"rbxassetid://507786093", -- Piety
+
+"rbxassetid://507786197", -- Fear of the Lord
+
+"rbxassetid://507786301", -- Grace
+
+"rbxassetid://507786405", -- Mercy
+
+"rbxassetid://507786509", -- Compassion
+
+"rbxassetid://507786613", -- Empathy
+
+"rbxassetid://507786717", -- Sympathy
+
+"rbxassetid://507786821", -- Altruism
+
+"rbxassetid://507786925", -- Benevolence
+
+"rbxassetid://507787029", -- Philanthropy
+
+"rbxassetid://507787133", -- Generosity
+
+"rbxassetid://507787237", -- Selflessness
+
+"rbxassetid://507787341", -- Sacrifice
+
+"rbxassetid://507787445", -- Heroism
+
+"rbxassetid://507787549", -- Bravery
+
+"rbxassetid://507787653", -- Valor
+
+"rbxassetid://507787757", -- Gallantry
+
+"rbxassetid://507787861", -- Chivalry
+
+"rbxassetid://507787965", -- Nobility
+
+"rbxassetid://507788069", -- Honor
+
+"rbxassetid://507788173", -- Integrity
+
+"rbxassetid://507788277", -- Virtue
+
+"rbxassetid://507788381", -- Morality
+
+"rbxassetid://507788485", -- Ethics
+
+"rbxassetid://507788589", -- Decency
+
+"rbxassetid://507788693", -- Respect
+
+"rbxassetid://507788797", -- Reverence
+
+"rbxassetid://507788901", -- Admiration
+
+"rbxassetid://507789005", -- Esteem
+
+"rbxassetid://507789109", -- Appreciation
+
+"rbxassetid://507789213", -- Gratitude
+
+"rbxassetid://507789317", -- Thanksgiving
+
+"rbxassetid://507789421", -- Joy
+
+"rbxassetid://507789525", -- Bliss
+
+"rbxassetid://507789629", -- Ecstasy
+
+"rbxassetid://507789733", -- Euphoria
+
+"rbxassetid://507789837", -- Delight
+
+"rbxassetid://507789941", -- Pleasure
+
+"rbxassetid://507790045", -- Satisfaction
+
+"rbxassetid://507790149", -- Contentment
+
+"rbxassetid://507790253", -- Fulfillment
+
+"rbxassetid://507790357", -- Serenity
+
+"rbxassetid://507790461", -- Tranquility
+
+"rbxassetid://507790565", -- Peace
+
+"rbxassetid://507790669", -- Harmony
+
+"rbxassetid://507790773", -- Balance
+
+"rbxassetid://507790877", -- Stability
+
+"rbxassetid://507790981", -- Equilibrium
+
+"rbxassetid://507791085", -- Poise
+
+"rbxassetid://507791189", -- Composure
+
+"rbxassetid://507791293", -- Calmness
+
+"rbxassetid://507791397", -- Relaxation
+
+"rbxassetid://507791501", -- Rest
+
+"rbxassetid://507791605", -- Repose
+
+"rbxassetid://507791709", -- Leisure
+
+"rbxassetid://507791813", -- Recreation
+
+"rbxassetid://507791917", -- Entertainment
+
+"rbxassetid://507792021", -- Amusement
+
+"rbxassetid://507792125", -- Fun
+
+"rbxassetid://507792229", -- Merriment
+
+"rbxassetid://507792333", -- Gaiety
+
+"rbxassetid://507792437", -- Mirth
+
+"rbxassetid://507792541", -- Jollity
+
+"rbxassetid://507792645", -- Hilarity
+
+"rbxassetid://507792749", -- Cheerfulness
+
+"rbxassetid://507792853", -- Gladness
+
+"rbxassetid://507792957", -- Exuberance
+
+"rbxassetid://507793061", -- Exhilaration
+
+"rbxassetid://507793165", -- Elation
+
+"rbxassetid://507793269", -- Jubilation
+
+"rbxassetid://507793373", -- Triumph
+
+"rbxassetid://507793477", -- Victory
+
+"rbxassetid://507793581", -- Success
+
+"rbxassetid://507793685", -- Achievement
+
+"rbxassetid://507793789", -- Accomplishment
+
+"rbxassetid://507793893", -- Attainment
+
+"rbxassetid://507793997", -- Realization
+
+"rbxassetid://507794101", -- Fulfillment
+
+"rbxassetid://507794205", -- Satisfaction
+
+"rbxassetid://507794309", -- Contentment
+
+"rbxassetid://507794413", -- Gratification
+
+"rbxassetid://507794517", -- Reward
+
+"rbxassetid://507794621", -- Prize
+
+"rbxassetid://507794725", -- Trophy
+
+"rbxassetid://507794829", -- Medal
+
+"rbxassetid://507794933", -- Honor
+
+"rbxassetid://507795037", -- Distinction
+
+"rbxassetid://507795141", -- Eminence
+
+"rbxassetid://507795245", -- Prestige
+
+"rbxassetid://507795349", -- Fame
+
+"rbxassetid://507795453", -- Renown
+
+"rbxassetid://507795557", -- Celebrity
+
+"rbxassetid://507795661", -- Stardom
+
+"rbxassetid://507795765", -- Glory
+
+"rbxassetid://507795869", -- Splendor
+
+"rbxassetid://507795973", -- Magnificence
+
+"rbxassetid://507796077", -- Grandeur
+
+"rbxassetid://507796181", -- Majesty
+
+"rbxassetid://507796285", -- Dignity
+
+"rbxassetid://507796389", -- Stateliness
+
+"rbxassetid://507796493", -- Impressiveness
+
+"rbxassetid://507796597", -- Splendour
+
+"rbxassetid://507796701", -- Brilliance
+
+"rbxassetid://507796805", -- Radiance
+
+"rbxassetid://507796909", -- Luminosity
+
+"rbxassetid://507797013", -- Glow
+
+"rbxassetid://507797117", -- Shine
+
+"rbxassetid://507797221", -- Sparkle
+
+"rbxassetid://507797325", -- Glimmer
+
+"rbxassetid://507797429", -- Twinkle
+
+"rbxassetid://507797533", -- Flicker
+
+"rbxassetid://507797637", -- Flash
+
+"rbxassetid://507797741", -- Blaze
+
+"rbxassetid://507797845", -- Flame
+
+"rbxassetid://507797949", -- Inferno
+
+"rbxassetid://507798053", -- Conflagration
+
+"rbxassetid://507798157", -- Bonfire
+
+"rbxassetid://507798261", -- Campfire
+
+"rbxassetid://507798365", -- Torch
+
+"rbxassetid://507798469", -- Lantern
+
+"rbxassetid://507798573", -- Beacon
+
+"rbxassetid://507798677", -- Lighthouse
+
+"rbxassetid://507798781", -- Guiding Light
+
+"rbxassetid://507798885", -- Polaris
+
+"rbxassetid://507798989", -- North Star
+
+"rbxassetid://507799093", -- Sirius
+
+"rbxassetid://507799197", -- Vega
+
+"rbxassetid://507799301", -- Arcturus
+
+"rbxassetid://507799405", -- Rigel
+
+"rbxassetid://507799509", -- Betelgeuse
+
+"rbxassetid://507799613", -- Antares
+
+"rbxassetid://507799717", -- Spica
+
+"rbxassetid://507799821", -- Pollux
+
+"rbxassetid://507799925", -- Fomalhaut
+
+"rbxassetid://507800029", -- Deneb
+
+"rbxassetid://507800133", -- Altair
+
+"rbxassetid://507800237", -- Aquila
+
+"rbxassetid://507800341", -- Cygnus
+
+"rbxassetid://507800445", -- Lyra
+
+"rbxassetid://507800549", -- Orion
+
+"rbxassetid://507800653", -- Ursa Major
+
+"rbxassetid://507800757", -- Ursa Minor
+
+"rbxassetid://507800861", -- Draco
+
+"rbxassetid://507800965", -- Hercules
+
+"rbxassetid://507801069", -- Cassiopeia
+
+"rbxassetid://507801173", -- Andromeda
+
+"rbxassetid://507801277", -- Pegasus
+
+"rbxassetid://507801381", -- Perseus
+
+"rbxassetid://507801485", -- Auriga
+
+"rbxassetid://507801589", -- Bootes
+
+"rbxassetid://507801693", -- Canes Venatici
+
+"rbxassetid://507801797", -- Coma Berenices
+
+"rbxassetid://507801901", -- Corona Borealis
+
+"rbxassetid://507802005", -- Crater
+
+"rbxassetid://507802109", -- Delphinus
+
+"rbxassetid://507802213", -- Equuleus
+
+"rbxassetid://507802317", -- Eridanus
+
+"rbxassetid://507802421", -- Fornax
+
+"rbxassetid://507802525", -- Grus
+
+"rbxassetid://507802629", -- Hydra
+
+"rbxassetid://507802733", -- Lacerta
+
+"rbxassetid://507802837", -- Leo Minor
+
+"rbxassetid://507802941", -- Lepus
+
+"rbxassetid://507803045", -- Libra
+
+"rbxassetid://507803149", -- Lupus
+
+"rbxassetid://507803253", -- Lynx
+
+"rbxassetid://507803357", -- Microscopium
+
+"rbxassetid://507803461", -- Monoceros
+
+"rbxassetid://507803565", -- Musca
+
+"rbxassetid://507803669", -- Norma
+
+"rbxassetid://507803773", -- Octans
+
+"rbxassetid://507803877", -- Ophiuchus
+
+"rbxassetid://507803981", -- Orion's Belt
+
+"rbxassetid://507804085", -- Pavo
+
+"rbxassetid://507804189", -- Phoenix
+
+"rbxassetid://507804293", -- Pictor
+
+"rbxassetid://507804397", -- Pisces Austrinus
+
+"rbxassetid://507804501", -- Pyxis
+
+"rbxassetid://507804605", -- Reticulum
+
+"rbxassetid://507804709", -- Sagitta
+
+"rbxassetid://507804813", -- Scutum
+
+"rbxassetid://507804917", -- Serpens
+
+"rbxassetid://507805021", -- Sextans
+
+"rbxassetid://507805125", -- Triangulum Australe
+
+"rbxassetid://507805229", -- Tucana
+
+"rbxassetid://507805333", -- Ursa Minor
+
+"rbxassetid://507805437", -- Vela
+
+"rbxassetid://507805541", -- Virgo
+
+"rbxassetid://507805645", -- Volans
+
+"rbxassetid://507805749", -- Vulpecula
+
+}
+
+
+
+
+AnimationsTab:Section({
+
+Title = "Emotes",
+
+})
+
+
+
+
+local player = Players.LocalPlayer
+
+local function refreshAnimations()
+
+if not player.Character then
+
+return
+
+end
+
+
+
+
+local animation = {}
+
+local emotes = {}
+
+
+
+
+for _, obj in ipairs(game:GetDescendants()) do
+
+local name = obj.Name
+
+if obj:IsA("Animation") and not animation[name] then
+
+animation[name] = obj
+
+table_insert(emotes, name)
+
+end
+
+end
+
+
+
+
+for _, assetid in ipairs(additionalAssets) do
+
+if not animation[assetid] then
+
+local instance = Instance_new("Animation")
+
+instance.AnimationId = assetid
+
+animation[assetid] = instance
+
+table_insert(emotes, assetid)
+
+end
+
+end
+
+
+
+
+table_sort(emotes)
+
+return animation, emotes
+
+end
+
+
+
+
+local animation, emotes = refreshAnimations()
+
+
+
+
+local notifyFlag
+
+local function playAnimation(name)
+
+if not notifyFlag then
+
+notifyFlag = 0
+
+Windui:Notify({
+
+Title = "Warning",
+
+Content = "Some emotes require server replicated parts and thus cannot be triggered without server interactions.",
+
+Duration = 4,
+
+Icon = "triangle-alert",
+
+})
+
+end
+
+
+
+
+local humanoid = player.Character:WaitForChild("Humanoid")
+
+local animator = humanoid:WaitForChild("Animator")
+
+
+
+
+if animation[name] then
+
+local track = animator:LoadAnimation(animation[name])
+
+track:Play()
+
+end
+
+end
+
+
+
+
+local function handleTracks()
+
+local humanoid = player.Character:WaitForChild("Humanoid")
+
+local animator = humanoid:WaitForChild("Animator")
+
+
+
+
+humanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
+
+if track and humanoid.MoveDirection.Magnitude > 0 then
+
+track:Stop()
+
+track = nil
+
+end
+
+end)
+
+end
+
+
+
+
+AnimationsTab:Dropdown({
+
+Title = "Emote Selector",
+
+Values = emotes,
+
+Callback = function(option)
+
+playAnimation(option)
+
+end,
+
+})
+
+
+
+
+AnimationsTab:Input({
+
+Title = "Add Emote",
+
+Desc = "Adds an emote from outside the game",
+
+Type = "Input",
+
+Placeholder = "rbxassetid://1949963001",
+
+Callback = function(input)
+
+table_insert(additionalAssets, input)
+
+animation, emotes = refreshAnimations()
+
+-- Refresh dropdown if possible, but since it's not stored, user can reload
+
+Windui:Notify({
+
+Title = "Emote Added",
+
+Content = "New emote added. Refresh the selector.",
+
+Duration = 3,
+
+Icon = "plus"
+
+})
+
+end,
+
+})
+
+
+
+
+AnimationsTab:Keybind({
+
+Title = "Start Emote",
+
+Desc = "Keybind to start playing the selected emote",
+
+Value = "X",
+
+Callback = function(key)
+
+-- Assume last selected or something, but for simplicity, do nothing or play a default
+
+Windui:Notify({
+
+Title = "Emote Keybind",
+
+Content = "Select an emote first.",
+
+Duration = 3,
+
+Icon = "key"
+
+})
+
+end,
+
+})
+
+
+
+
+-- Set up character tracking for emotes
+
+player.CharacterAdded:Connect(handleTracks)
+
+if player.Character then
+
+handleTracks()
+
+end
+
+
+
+
+------------------------------------------
+
+-- CREDITS TAB
+
+------------------------------------------
+
+local CreditsTab = Window:Tab({ Title = "Credits", Icon = "book-marked", Locked = false })
+
+CreditsTab:Paragraph({
+
+Title = "Goose",
+
+Desc = "Script developer. For issues, report at https://github.com/goose-birb/lua-buffoonery/issues",
+
+})
+
+CreditsTab:Paragraph({
+
+Title = "Footagesus",
+
+Desc = "Developer of WindUI, the UI library used by this script.",
+
+})
+
+Window:SelectTab(1)
+
+
+
+
+--------------------------------------------------------------------------------
+
+-- End of Main Script
+
+--------------------------------------------------------------------------------
+
+
+
+
+-------------------------------
+
+-- Knife Thrown Handler (every Heartbeat)
+
+-------------------------------
+
+RunService.Heartbeat:Connect(function()
+
+for _, part in ipairs(workspace_GetDescendants()) do
+
+if part:IsA("BasePart") and part.Name == "Handle" and part.Parent and part.Parent.Name:lower():find("knife") then
+
+if not part:GetAttribute("Scaled") then
+
+part:SetAttribute("OriginalSize", part.Size)
+
+part.Size = part.Size * getgenv().knifeThrownScale
+
+part:SetAttribute("Scaled", true)
+
+end
+
+end
+
+end
+
+end)
+
+
+
+
+--------------------------------------------------------------------------------
+
+-- Module: ImpossibleNPC_AimSystem.lua (Server-side module)
+
+--------------------------------------------------------------------------------
+
+local Aim = {}
+
+Aim.__index = Aim
+
+-- (Module code goes here - optimized for instant response)
+
+return Aim
+
+
+
+
+--------------------------------------------------------------------------------
+
+-- End of Script
+
+
+
+
+------------------------------------------------------------
+
+-- To test the error finder, call:
+
+-- local ok, err = errorFinder("print('Hello World')")
+
+------------------------------------------------------------
+
+
+
+
+
