@@ -319,6 +319,11 @@ getgenv().loopKillInstantTP = false
 
 getgenv().teamCheckKill = true
 
+-- Dash gun re-equip fix
+getgenv().lastEquippedTool = nil
+getgenv().reEquipEnabled = true
+getgenv().reEquipDelay = 0.1
+
 getgenv().nearestCheckKill = true
 
 getgenv().antiLagMode = false
@@ -1046,6 +1051,61 @@ if cacheCleanupTimer >= cacheCleanupInterval then
 	
 	cacheCleanupTimer = 0
 end
+
+end)
+
+
+----------------------------------------------------
+
+-- Dash Gun Re-Equip Fix
+
+----------------------------------------------------
+
+local function setupToolTracking(character)
+
+if not character then return end
+
+local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+if not humanoid then return end
+
+humanoid.ToolEquipped:Connect(function(tool)
+
+if getgenv().reEquipEnabled then
+
+getgenv().lastEquippedTool = tool
+
+end
+
+end)
+
+humanoid.ToolUnequipped:Connect(function(tool)
+
+if getgenv().reEquipEnabled and getgenv().lastEquippedTool == tool then
+
+task.wait(getgenv().reEquipDelay)
+
+if tool.Parent == localPlayer.Backpack and localPlayer.Character == character then
+
+humanoid:EquipTool(tool)
+
+end
+
+end
+
+end)
+
+end
+
+if localPlayer.Character then
+
+setupToolTracking(localPlayer.Character)
+
+end
+
+localPlayer.CharacterAdded:Connect(function(character)
+
+setupToolTracking(character)
 
 end)
 
@@ -2119,6 +2179,54 @@ elseif crashConn then
 crashConn:Disconnect()
 
 end
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "Auto Re-Equip Gun After Dash",
+
+Desc = "Automatically re-equip weapon when unequipped by dash/ability",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().reEquipEnabled = state
+
+local icon = state and "check" or "xmark"
+
+Windui:Notify({
+
+Title = "Auto Re-Equip",
+
+Content = state and "Gun will auto re-equip after dash." or "Auto re-equip disabled.",
+
+Duration = 3,
+
+Icon = icon
+
+})
+
+end,
+
+})
+
+MiscTab:Slider({
+
+Title = "Re-Equip Delay",
+
+Desc = "Delay (seconds) before re-equipping weapon after dash",
+
+Step = 0.05,
+
+Value = {Min = 0, Max = 1, Default = 0.1},
+
+Callback = function(value)
+
+getgenv().reEquipDelay = tonumber(value)
 
 end,
 
