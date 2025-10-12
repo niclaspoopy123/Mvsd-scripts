@@ -78,6 +78,15 @@ Successfully implemented a comprehensive AI Auto-Play system that autonomously p
 - Calculates optimal position based on target distance
 - Adapts to movement style (4 styles available)
 - Uses Humanoid:MoveTo() for natural movement
+- **NEW**: PathfindingService integration for obstacle avoidance
+
+✅ **Smart Pathfinding** (NEW)
+- Automatic obstacle detection and avoidance
+- Waypoint-based navigation
+- Handles elevation changes with automatic jumping
+- Configurable minimum distance for pathfinding
+- Periodic path recomputation for moving targets
+- Falls back to direct movement for short distances
 
 ✅ **Evasive Maneuvers**
 - Random jumping/dodging (10% chance per update)
@@ -310,8 +319,8 @@ Successfully implemented a comprehensive AI Auto-Play system that autonomously p
 
 ## Known Limitations
 
-1. **Pathfinding**: No advanced pathfinding (uses direct movement)
-2. **Obstacles**: May not navigate around large obstacles
+1. ~~**Pathfinding**: No advanced pathfinding (uses direct movement)~~ ✅ **FIXED** - Now uses PathfindingService for obstacle avoidance
+2. ~~**Obstacles**: May not navigate around large obstacles~~ ✅ **FIXED** - AI can now navigate around obstacles
 3. **Cover**: No cover seeking yet (planned for future)
 4. **Abilities**: No special ability usage yet (planned)
 5. **Team Coordination**: No team coordination yet (planned)

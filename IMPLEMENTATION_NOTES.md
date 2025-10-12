@@ -84,6 +84,10 @@ Created new "AI Auto-Play" tab with:
 - [x] Evasive maneuvers (dodge, strafe, jump)
 - [x] Natural movement using Humanoid:MoveTo()
 - [x] Distance management
+- [x] **PathfindingService integration** (NEW - October 2025)
+- [x] **Obstacle avoidance and navigation** (NEW)
+- [x] **Waypoint-based pathfinding** (NEW)
+- [x] **Automatic jump handling** (NEW)
 
 ### Combat AI ✅
 - [x] Automatic target selection
