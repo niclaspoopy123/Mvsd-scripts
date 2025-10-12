@@ -323,6 +323,10 @@ getgenv().nearestCheckKill = true
 
 getgenv().antiLagMode = false
 
+getgenv().sniperShootActive = false
+
+getgenv().loopSniperShootActive = false
+
 
 
 
@@ -2615,6 +2619,94 @@ local remote = ReplicatedStorage:FindFirstChild("GunShoot")
 if remote then
 
 remote:FireServer()
+
+end
+
+end,
+
+})
+
+MiscTab:Button({
+
+Title = "Sniper Shoot",
+
+Desc = "Fire a single sniper shot with enhanced targeting.",
+
+Callback = function()
+
+local sniperRemote = ReplicatedStorage:FindFirstChild("SniperShoot") or ReplicatedStorage:FindFirstChild("GunShoot")
+
+if sniperRemote then
+
+-- Enhanced sniper targeting with player name integration
+
+local args = {
+
+[1] = localPlayer.Name,  -- Replace 'playername' placeholder with local player's name
+
+[2] = "sniper",
+
+[3] = true
+
+}
+
+sniperRemote:FireServer(unpack(args))
+
+Windui:Notify({ Title = "Sniper Shot", Content = "Sniper shot fired by " .. localPlayer.Name, Duration = 2, Icon = "target" })
+
+end
+
+end,
+
+})
+
+MiscTab:Toggle({
+
+Title = "Loop Sniper Shoot",
+
+Desc = "Continuously fire sniper shots with enhanced targeting.",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().loopSniperShootActive = state
+
+local icon, content = state and "target" or "xmark", state and "Sniper loop activated." or "Sniper loop deactivated."
+
+Windui:Notify({ Title = "Loop Sniper Shoot", Content = content, Duration = 3, Icon = icon })
+
+if state then
+
+task_spawn(function()
+
+while getgenv().loopSniperShootActive do
+
+local sniperRemote = ReplicatedStorage:FindFirstChild("SniperShoot") or ReplicatedStorage:FindFirstChild("GunShoot")
+
+if sniperRemote then
+
+-- Enhanced sniper targeting with player name integration
+
+local args = {
+
+[1] = localPlayer.Name,  -- Replace 'playername' placeholder with local player's name
+
+[2] = "sniper",
+
+[3] = true
+
+}
+
+sniperRemote:FireServer(unpack(args))
+
+end
+
+task_wait(0.1)  -- Slower fire rate for sniper precision
+
+end
+
+end)
 
 end
 
