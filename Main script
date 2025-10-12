@@ -340,6 +340,34 @@ getgenv().mlAutoShootConfig = {
 	MAX_SHOOT_DISTANCE = 500, -- Maximum distance to attempt shooting
 }
 
+-- AI Auto-Play Configuration
+getgenv().aiAutoPlayActive = false
+getgenv().aiAutoPlayConfig = {
+	ENABLED = false,
+	-- Movement AI Settings
+	MOVEMENT_ENABLED = true,
+	MOVEMENT_STYLE = "aggressive", -- aggressive, balanced, defensive, evasive
+	DODGE_ENABLED = true,
+	DODGE_DISTANCE = 30, -- Distance at which to dodge
+	STRAFE_ENABLED = true,
+	CIRCLE_STRAFE = true,
+	-- Combat AI Settings
+	COMBAT_ENABLED = true,
+	AUTO_AIM = true,
+	AUTO_SHOOT = true,
+	WEAPON_SWITCH = true,
+	ABILITY_USAGE = true,
+	TARGET_PRIORITY = "nearest", -- nearest, weakest, strongest
+	-- Strategy AI Settings
+	STRATEGY_ENABLED = true,
+	COVER_SEEKING = true,
+	HEALTH_THRESHOLD = 30, -- Retreat when health below this
+	AGGRESSION_LEVEL = 0.7, -- 0.0-1.0, higher = more aggressive
+	-- Update rates
+	DECISION_RATE = 0.1, -- How often to make decisions (seconds)
+	MOVEMENT_UPDATE_RATE = 0.05, -- How often to update movement
+}
+
 
 
 
@@ -1297,6 +1325,303 @@ end
 local mlPredictor = MLPredictor.new()
 
 
+----------------------------------------------------
+-- AI Auto-Play System - Intelligent Game Bot
+----------------------------------------------------
+
+local AIAutoPlay = {}
+AIAutoPlay.__index = AIAutoPlay
+
+function AIAutoPlay.new()
+	local self = setmetatable({}, AIAutoPlay)
+	
+	-- AI State
+	self.currentTarget = nil
+	self.lastDecision = 0
+	self.lastMovement = 0
+	self.threatLevel = 0
+	self.isRetreating = false
+	self.coverPosition = nil
+	self.movementPattern = 1
+	
+	-- Cached references
+	self.localPlayer = localPlayer
+	
+	return self
+end
+
+-- Get all valid enemies
+function AIAutoPlay:getEnemies()
+	local enemies = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= self.localPlayer and player.Character then
+			-- Check team
+			if getgenv().teamCheckKill then
+				if self.localPlayer.Team and player.Team and self.localPlayer.Team == player.Team then
+					continue
+				end
+			end
+			
+			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+			local humanoid = player.Character:FindFirstChild("Humanoid")
+			if hrp and humanoid and humanoid.Health > 0 then
+				table_insert(enemies, player)
+			end
+		end
+	end
+	return enemies
+end
+
+-- Calculate threat level based on nearby enemies
+function AIAutoPlay:calculateThreatLevel(myPos)
+	local threatLevel = 0
+	local enemies = self:getEnemies()
+	
+	for _, enemy in ipairs(enemies) do
+		local enemyPos = enemy.Character.HumanoidRootPart.Position
+		local distance = (enemyPos - myPos).Magnitude
+		
+		-- Closer enemies = higher threat
+		if distance < 50 then
+			threatLevel = threatLevel + (50 - distance) / 50
+		end
+	end
+	
+	return math_min(threatLevel, 1.0)
+end
+
+-- Select best target based on strategy
+function AIAutoPlay:selectTarget(myPos)
+	local enemies = self:getEnemies()
+	if #enemies == 0 then return nil end
+	
+	local config = getgenv().aiAutoPlayConfig
+	local bestTarget = nil
+	local bestScore = -math_huge
+	
+	for _, enemy in ipairs(enemies) do
+		local enemyPos = enemy.Character.HumanoidRootPart.Position
+		local distance = (enemyPos - myPos).Magnitude
+		local humanoid = enemy.Character:FindFirstChild("Humanoid")
+		
+		local score = 0
+		
+		if config.TARGET_PRIORITY == "nearest" then
+			score = 1000 - distance -- Closer = better
+		elseif config.TARGET_PRIORITY == "weakest" then
+			score = (100 - humanoid.Health) + (500 - distance * 0.5)
+		elseif config.TARGET_PRIORITY == "strongest" then
+			score = humanoid.Health + (500 - distance * 0.5)
+		end
+		
+		if score > bestScore then
+			bestScore = score
+			bestTarget = enemy
+		end
+	end
+	
+	return bestTarget
+end
+
+-- Calculate optimal movement position
+function AIAutoPlay:calculateMovementPosition(myPos, targetPos)
+	local config = getgenv().aiAutoPlayConfig
+	local movementStyle = config.MOVEMENT_STYLE
+	
+	-- Base direction towards target
+	local dirToTarget = (targetPos - myPos).Unit
+	local distance = (targetPos - myPos).Magnitude
+	
+	-- Adjust based on movement style
+	if movementStyle == "aggressive" then
+		-- Move directly towards target
+		return myPos + dirToTarget * math_min(distance - 20, 10)
+		
+	elseif movementStyle == "balanced" then
+		-- Maintain optimal distance (30-40 studs)
+		local optimalDist = 35
+		if distance > optimalDist + 10 then
+			return myPos + dirToTarget * 10
+		elseif distance < optimalDist - 10 then
+			return myPos - dirToTarget * 10
+		else
+			-- Strafe
+			local strafeAngle = math_sin(tick() * 2) * math_rad(45)
+			local strafeDir = Vector3_new(
+				dirToTarget.X * math_cos(strafeAngle) - dirToTarget.Z * math_sin(strafeAngle),
+				0,
+				dirToTarget.X * math_sin(strafeAngle) + dirToTarget.Z * math_cos(strafeAngle)
+			)
+			return myPos + strafeDir * 8
+		end
+		
+	elseif movementStyle == "defensive" then
+		-- Keep distance, move away if too close
+		if distance < 40 then
+			return myPos - dirToTarget * 10
+		else
+			-- Circle strafe at distance
+			local strafeAngle = tick() * 1.5
+			local strafeDir = Vector3_new(
+				dirToTarget.X * math_cos(strafeAngle) - dirToTarget.Z * math_sin(strafeAngle),
+				0,
+				dirToTarget.X * math_sin(strafeAngle) + dirToTarget.Z * math_cos(strafeAngle)
+			)
+			return myPos + strafeDir * 6
+		end
+		
+	elseif movementStyle == "evasive" then
+		-- Zigzag movement pattern
+		local pattern = math_floor(tick() * 2) % 2
+		local offset = pattern == 0 and 45 or -45
+		local angle = math_rad(offset)
+		local evasiveDir = Vector3_new(
+			dirToTarget.X * math_cos(angle) - dirToTarget.Z * math_sin(angle),
+			0,
+			dirToTarget.X * math_sin(angle) + dirToTarget.Z * math_cos(angle)
+		)
+		return myPos + evasiveDir * 12
+	end
+	
+	return myPos
+end
+
+-- Execute movement towards position
+function AIAutoPlay:moveToPosition(targetPos)
+	local myChar = self.localPlayer.Character
+	if not myChar then return end
+	
+	local humanoid = myChar:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+	
+	-- Use Humanoid:MoveTo for natural movement
+	humanoid:MoveTo(targetPos)
+	
+	-- Random jumping for evasion
+	if getgenv().aiAutoPlayConfig.DODGE_ENABLED then
+		if math.random() < 0.1 then -- 10% chance per update
+			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+	end
+end
+
+-- Execute combat actions
+function AIAutoPlay:executeCombat(target)
+	local config = getgenv().aiAutoPlayConfig
+	
+	if not target or not target.Character then return end
+	
+	local myChar = self.localPlayer.Character
+	if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+	
+	local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+	if not targetHRP then return end
+	
+	local myPos = myChar.HumanoidRootPart.Position
+	local targetPos = targetHRP.Position
+	local distance = (targetPos - myPos).Magnitude
+	
+	-- Auto aim (rotate camera towards target)
+	if config.AUTO_AIM then
+		local camera = workspace.CurrentCamera
+		if camera then
+			camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
+		end
+	end
+	
+	-- Auto shoot
+	if config.AUTO_SHOOT then
+		-- Check if within reasonable distance
+		if distance <= 500 then
+			local remoteGun = ReplicatedStorage:FindFirstChild("GunShoot")
+			if remoteGun then
+				remoteGun:FireServer()
+			end
+		end
+	end
+	
+	-- Auto weapon switch (prefer gun over knife at range)
+	if config.WEAPON_SWITCH then
+		local humanoid = myChar:FindFirstChildOfClass("Humanoid")
+		if not humanoid then return end
+		
+		local tool = myChar:FindFirstChildOfClass("Tool")
+		if distance > 15 and tool and tool.Name:lower():find("knife") then
+			-- Try to equip gun
+			for _, item in ipairs(self.localPlayer.Backpack:GetChildren()) do
+				if item:IsA("Tool") and item.Name:lower():find("gun") then
+					humanoid:EquipTool(item)
+					break
+				end
+			end
+		elseif distance <= 15 and tool and tool.Name:lower():find("gun") then
+			-- Try to equip knife
+			for _, item in ipairs(self.localPlayer.Backpack:GetChildren()) do
+				if item:IsA("Tool") and item.Name:lower():find("knife") then
+					humanoid:EquipTool(item)
+					break
+				end
+			end
+		end
+	end
+end
+
+-- Main AI decision loop
+function AIAutoPlay:makeDecision()
+	local myChar = self.localPlayer.Character
+	if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+	
+	local myPos = myChar.HumanoidRootPart.Position
+	local humanoid = myChar:FindFirstChild("Humanoid")
+	if not humanoid then return end
+	
+	local config = getgenv().aiAutoPlayConfig
+	
+	-- Calculate threat level
+	self.threatLevel = self:calculateThreatLevel(myPos)
+	
+	-- Check if should retreat
+	local health = humanoid.Health
+	local maxHealth = humanoid.MaxHealth
+	local healthPercent = (health / maxHealth) * 100
+	
+	if config.STRATEGY_ENABLED and healthPercent < config.HEALTH_THRESHOLD then
+		self.isRetreating = true
+	elseif healthPercent > config.HEALTH_THRESHOLD + 20 then
+		self.isRetreating = false
+	end
+	
+	-- Select target
+	self.currentTarget = self:selectTarget(myPos)
+	
+	-- Execute movement
+	if config.MOVEMENT_ENABLED then
+		if self.isRetreating then
+			-- Move away from nearest enemy
+			if self.currentTarget and self.currentTarget.Character then
+				local enemyPos = self.currentTarget.Character.HumanoidRootPart.Position
+				local awayDir = (myPos - enemyPos).Unit
+				local retreatPos = myPos + awayDir * 20
+				self:moveToPosition(retreatPos)
+			end
+		elseif self.currentTarget and self.currentTarget.Character then
+			-- Move according to strategy
+			local targetPos = self.currentTarget.Character.HumanoidRootPart.Position
+			local optimalPos = self:calculateMovementPosition(myPos, targetPos)
+			self:moveToPosition(optimalPos)
+		end
+	end
+	
+	-- Execute combat
+	if config.COMBAT_ENABLED and not self.isRetreating then
+		if self.currentTarget then
+			self:executeCombat(self.currentTarget)
+		end
+	end
+end
+
+-- Global AI instance
+local aiAutoPlay = AIAutoPlay.new()
 
 
 ----------------------------------------------------
@@ -3572,6 +3897,207 @@ end
 end)
 
 
+
+
+------------------------------------------
+-- AI AUTO-PLAY TAB
+------------------------------------------
+
+local AITab = Window:Tab({ Title = "AI Auto-Play", Icon = "bot", Locked = false })
+
+AITab:Section({
+	Title = "Auto-Play Controls",
+})
+
+AITab:Toggle({
+	Title = "Enable AI Auto-Play",
+	Desc = "Activate the AI to automatically play the game (movement, combat, strategy)",
+	Value = false,
+	Callback = function(state)
+		getgenv().aiAutoPlayActive = state
+		getgenv().aiAutoPlayConfig.ENABLED = state
+		
+		local icon, content = state and "bot" or "xmark", state and "AI Auto-Play activated! The bot is now playing." or "AI Auto-Play deactivated."
+		Windui:Notify({ Title = "AI Auto-Play", Content = content, Duration = 3, Icon = icon })
+		
+		if state then
+			task_spawn(function()
+				while getgenv().aiAutoPlayActive do
+					local currentTime = tick()
+					
+					-- Make AI decisions
+					if currentTime - aiAutoPlay.lastDecision >= getgenv().aiAutoPlayConfig.DECISION_RATE then
+						pcall(function()
+							aiAutoPlay:makeDecision()
+						end)
+						aiAutoPlay.lastDecision = currentTime
+					end
+					
+					task_wait(getgenv().aiAutoPlayConfig.MOVEMENT_UPDATE_RATE)
+				end
+			end)
+		end
+	end,
+})
+
+AITab:Section({
+	Title = "Movement Settings",
+})
+
+AITab:Toggle({
+	Title = "Movement AI",
+	Desc = "Enable intelligent movement and positioning",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.MOVEMENT_ENABLED = state
+	end,
+})
+
+AITab:Dropdown({
+	Title = "Movement Style",
+	Desc = "Choose the AI's movement behavior",
+	Values = {"aggressive", "balanced", "defensive", "evasive"},
+	Default = "aggressive",
+	Callback = function(option)
+		getgenv().aiAutoPlayConfig.MOVEMENT_STYLE = option
+		Windui:Notify({ Title = "Movement Style", Content = "AI will now use " .. option .. " movement style.", Duration = 2, Icon = "move" })
+	end,
+})
+
+AITab:Toggle({
+	Title = "Dodge Enabled",
+	Desc = "AI will dodge and jump randomly to evade attacks",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.DODGE_ENABLED = state
+	end,
+})
+
+AITab:Toggle({
+	Title = "Strafe Movement",
+	Desc = "AI will strafe around targets",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.STRAFE_ENABLED = state
+	end,
+})
+
+AITab:Section({
+	Title = "Combat Settings",
+})
+
+AITab:Toggle({
+	Title = "Combat AI",
+	Desc = "Enable intelligent combat decisions",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.COMBAT_ENABLED = state
+	end,
+})
+
+AITab:Toggle({
+	Title = "Auto Aim",
+	Desc = "AI will automatically aim at targets",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.AUTO_AIM = state
+	end,
+})
+
+AITab:Toggle({
+	Title = "Auto Shoot",
+	Desc = "AI will automatically shoot at targets",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.AUTO_SHOOT = state
+	end,
+})
+
+AITab:Toggle({
+	Title = "Auto Weapon Switch",
+	Desc = "AI will switch between weapons based on situation",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.WEAPON_SWITCH = state
+	end,
+})
+
+AITab:Dropdown({
+	Title = "Target Priority",
+	Desc = "How the AI selects targets",
+	Values = {"nearest", "weakest", "strongest"},
+	Default = "nearest",
+	Callback = function(option)
+		getgenv().aiAutoPlayConfig.TARGET_PRIORITY = option
+		Windui:Notify({ Title = "Target Priority", Content = "AI will prioritize " .. option .. " enemies.", Duration = 2, Icon = "target" })
+	end,
+})
+
+AITab:Section({
+	Title = "Strategy Settings",
+})
+
+AITab:Toggle({
+	Title = "Strategy AI",
+	Desc = "Enable strategic decision making (retreat, cover, etc.)",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.STRATEGY_ENABLED = state
+	end,
+})
+
+AITab:Slider({
+	Title = "Health Retreat Threshold",
+	Desc = "AI will retreat when health drops below this percentage",
+	Step = 5,
+	Value = {Min = 10, Max = 80, Default = 30},
+	Callback = function(value)
+		getgenv().aiAutoPlayConfig.HEALTH_THRESHOLD = tonumber(value)
+	end,
+})
+
+AITab:Slider({
+	Title = "Aggression Level",
+	Desc = "How aggressive the AI plays (0.0 = passive, 1.0 = very aggressive)",
+	Step = 0.1,
+	Value = {Min = 0.0, Max = 1.0, Default = 0.7},
+	Callback = function(value)
+		getgenv().aiAutoPlayConfig.AGGRESSION_LEVEL = tonumber(value)
+	end,
+})
+
+AITab:Section({
+	Title = "Performance",
+})
+
+AITab:Slider({
+	Title = "Decision Rate",
+	Desc = "How often AI makes decisions (seconds, lower = faster but more CPU)",
+	Step = 0.05,
+	Value = {Min = 0.05, Max = 0.5, Default = 0.1},
+	Callback = function(value)
+		getgenv().aiAutoPlayConfig.DECISION_RATE = tonumber(value)
+	end,
+})
+
+AITab:Slider({
+	Title = "Movement Update Rate",
+	Desc = "How often AI updates movement (seconds)",
+	Step = 0.01,
+	Value = {Min = 0.01, Max = 0.2, Default = 0.05},
+	Callback = function(value)
+		getgenv().aiAutoPlayConfig.MOVEMENT_UPDATE_RATE = tonumber(value)
+	end,
+})
+
+AITab:Section({
+	Title = "Information",
+})
+
+AITab:Paragraph({
+	Title = "About AI Auto-Play",
+	Desc = "This feature uses machine learning and intelligent decision-making to automatically play the game. The AI handles movement, combat, and strategy. Combine with ML Auto Shoot for best results.",
+})
 
 
 ------------------------------------------
