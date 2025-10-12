@@ -1,0 +1,134 @@
+ML Auto Shoot - Neural Network Architecture
+=============================================
+
+System Flow:
+-----------
+
+1. Enemy Tracking Phase:
+   ┌─────────────────────────────────────────────┐
+   │  For Each Enemy Player:                     │
+   │  - Detect HumanoidRootPart                  │
+   │  - Extract Position (X, Y, Z)               │
+   │  - Extract Velocity (VX, VY, VZ)            │
+   │  - Store in History Buffer (max 10 entries) │
+   └─────────────────────────────────────────────┘
+                      ↓
+2. Neural Network Prediction:
+   ┌─────────────────────────────────────────────┐
+   │  Input Layer (6 neurons)                    │
+   │  [posX, posY, posZ, velX, velY, velZ]       │
+   └─────────────────────────────────────────────┘
+                      ↓
+   ┌─────────────────────────────────────────────┐
+   │  Hidden Layer (8 neurons)                   │
+   │  Activation: ReLU                           │
+   │  Weights: Xavier Initialized                │
+   └─────────────────────────────────────────────┘
+                      ↓
+   ┌─────────────────────────────────────────────┐
+   │  Output Layer (3 neurons)                   │
+   │  [predicted X, predicted Y, predicted Z]    │
+   └─────────────────────────────────────────────┘
+                      ↓
+3. Confidence Calculation:
+   ┌─────────────────────────────────────────────┐
+   │  Analyze Velocity Consistency:              │
+   │  - Compare recent velocities                │
+   │  - Calculate average change                 │
+   │  - confidence = 1.0 - (avgChange / 50)      │
+   │  - clamp between 0.3 and 0.95               │
+   └─────────────────────────────────────────────┘
+                      ↓
+4. Target Selection:
+   ┌─────────────────────────────────────────────┐
+   │  For Each Predicted Position:               │
+   │  - Check if confidence > threshold          │
+   │  - Check if distance < max_distance         │
+   │  - Select highest confidence target         │
+   └─────────────────────────────────────────────┘
+                      ↓
+5. Shoot Execution:
+   ┌─────────────────────────────────────────────┐
+   │  If valid target found:                     │
+   │  - Fire GunShoot remote                     │
+   │  - Update last shot time                    │
+   │  - Respect shoot delay                      │
+   └─────────────────────────────────────────────┘
+
+
+Network Architecture Details:
+-----------------------------
+
+Layer 1 (Input):
+  Size: 6 neurons
+  Data: [posX, posY, posZ, velX, velY, velZ]
+  
+  Weights Matrix (6x8):
+  ┌                                   ┐
+  │ w11  w12  w13  w14  w15  w16  w17  w18 │
+  │ w21  w22  w23  w24  w25  w26  w27  w28 │
+  │ w31  w32  w33  w34  w35  w36  w37  w38 │
+  │ w41  w42  w43  w44  w45  w46  w47  w48 │
+  │ w51  w52  w53  w54  w55  w56  w57  w58 │
+  │ w61  w62  w63  w64  w65  w66  w67  w68 │
+  └                                   ┘
+  
+  Bias Vector (8):
+  [b1, b2, b3, b4, b5, b6, b7, b8]
+
+Layer 2 (Hidden):
+  Size: 8 neurons
+  Activation: ReLU (max(0, x))
+  
+  Weights Matrix (8x3):
+  ┌           ┐
+  │ w11 w12 w13 │
+  │ w21 w22 w23 │
+  │ w31 w32 w33 │
+  │ w41 w42 w43 │
+  │ w51 w52 w53 │
+  │ w61 w62 w63 │
+  │ w71 w72 w73 │
+  │ w81 w82 w83 │
+  └           ┘
+  
+  Bias Vector (3):
+  [b1, b2, b3]
+
+Layer 3 (Output):
+  Size: 3 neurons
+  Data: [predicted_X, predicted_Y, predicted_Z]
+  No activation (linear output)
+
+
+Fallback Mode (< 3 data points):
+---------------------------------
+
+When insufficient tracking data:
+  predictedPos = currentPos + velocity * predictionTime
+  confidence = 0.5
+  
+  where:
+    predictionTime = PREDICTION_FRAMES * 0.016
+    (0.016 seconds per frame at 60 FPS)
+
+
+Performance Characteristics:
+---------------------------
+
+- Forward Pass Complexity: O(6*8 + 8*3) = O(72) operations
+- Memory per Enemy: ~240 bytes (10 positions + 10 velocities)
+- Update Frequency: 20 Hz (every 0.05 seconds)
+- Cleanup Frequency: 1 Hz (every 1 second)
+- Shoot Frequency: Up to 100 Hz (every 0.01 seconds)
+
+
+Integration Points:
+------------------
+
+1. Global Config: getgenv().mlAutoShootConfig
+2. UI Toggle: MiscTab:Toggle("ML Auto Shoot")
+3. Gun Remote: ReplicatedStorage:FindFirstChild("GunShoot")
+4. Team Check: getgenv().teamCheckKill
+5. Player List: Players:GetPlayers()
+6. Character Model: player.Character:FindFirstChild("HumanoidRootPart")
