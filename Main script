@@ -147,7 +147,7 @@ REACTION_TIME = 0.0, -- instant reaction for better response
 
 ACTION_TIME = 0.0, -- no delay for faster aiming
 
-AIM_TICK = 0.0001, -- extremely frequent updates for ultra-fast reaction (improved from 0.0005)
+AIM_TICK = 0.00001, -- extremely frequent updates for ultra-fast reaction (optimized for maximum responsiveness)
 
 VISIBLE_PARTS = 1,
 
@@ -181,17 +181,19 @@ MAX_PREDICTION_LAG = 0.0,
 
 USE_VELOCITY_FILTER = true,
 
-VEL_FILTER_ALPHA = 0.95, -- more responsive velocity filter
+VEL_FILTER_ALPHA = 0.98, -- highly responsive velocity filter for faster reaction
+
+VELOCITY_PREDICTION_WEIGHT = 0.85, -- high weight for velocity-based prediction
 
 KALMAN_ENABLED = true,
 
 KALMAN = {
 
-measurementNoise = 0.01,
+measurementNoise = 0.005, -- reduced for more precise predictions
 
-processNoise = 1e-6,
+processNoise = 5e-7, -- reduced for faster convergence
 
-initialUncertainty = 1e-6,
+initialUncertainty = 5e-7, -- reduced for quicker initial tracking
 
 },
 
@@ -205,7 +207,7 @@ DISTANCE_FACTOR = 0.05, -- minimal deviation increase with distance
 
 VELOCITY_FACTOR = 0.05, -- minimal adjustment with target speed
 
-ACCURACY_BUILDUP = 0.1, -- rapid buildup to optimum accuracy
+ACCURACY_BUILDUP = 0.05, -- ultra-fast buildup to optimum accuracy for instant target acquisition
 
 MIN_DEVIATION = 0.0,
 
@@ -243,9 +245,11 @@ LABEL_UPDATE_RATE = 0.0,
 
 PERFORMANCE = {
 
-MAX_NPC_AIM_TICKS_PER_FRAME = 9999,
+MAX_NPC_AIM_TICKS_PER_FRAME = 99999, -- increased for unlimited update capacity
 
-DISTANCE_THROTTLE_STEPS = {},
+DISTANCE_THROTTLE_STEPS = {}, -- no throttling for maximum responsiveness
+
+TARGET_CACHE_TIME = 0.001, -- minimal cache time for instant target updates
 
 },
 
@@ -263,13 +267,17 @@ HIT_PIXEL_SHOT = true,
 
 HIT_PIXEL_THRESHOLD = 1.0,
 
-HIT_PIXEL_INTERPOLATION = 0.95,
+HIT_PIXEL_INTERPOLATION = 0.98, -- faster pixel detection response
 
 HIT_PIXEL_WEIGHT = 200, -- increased to strongly favor pixel detection
 
 FORCE_TARGET_LOCK = true, -- enforced target lock for instant engagement
 
-AIM_SMOOTHING = 0.5, -- added for better reaction smoothing
+AIM_SMOOTHING = 0.2, -- reduced for more responsive aim movement
+
+PREEMPTIVE_TARGETING = true, -- enable preemptive target acquisition
+
+PREDICTION_LOOKAHEAD = 3, -- frames to look ahead for target prediction
 
 }
 
@@ -440,6 +448,8 @@ getgenv().pixelSpatialClustering = true -- Enable spatial clustering for better 
 getgenv().pixelTemporalCoherence = true -- Enable temporal tracking for stability
 
 getgenv().pixelHistogramMatching = true -- Enable color histogram matching
+
+getgenv().pixelFastTrack = true -- Enable fast-track mode for immediate targeting
 
 
 
@@ -2167,7 +2177,7 @@ Desc = "Time to reach optimal accuracy after switching targets",
 
 Step = 0.01,
 
-Value = {Min = 0, Max = 0.5, Default = 0.1},
+Value = {Min = 0, Max = 0.5, Default = 0.05},
 
 Callback = function(value)
 
@@ -2223,9 +2233,9 @@ Title = "Aim Tick Frequency",
 
 Desc = "Frequency of aim updates (lower = faster reaction)",
 
-Step = 0.0001,
+Step = 0.00001,
 
-Value = {Min = 0.0001, Max = 0.01, Default = 0.0001},
+Value = {Min = 0.00001, Max = 0.01, Default = 0.00001},
 
 Callback = function(value)
 
@@ -2245,11 +2255,47 @@ Desc = "Smoothing factor for aim movement (lower = more responsive)",
 
 Step = 0.01,
 
-Value = {Min = 0.01, Max = 1.0, Default = 0.5},
+Value = {Min = 0.01, Max = 1.0, Default = 0.2},
 
 Callback = function(value)
 
 getgenv().aimConfig.AIM_SMOOTHING = tonumber(value)
+
+end,
+
+})
+
+-- Added Preemptive Targeting Controls
+
+AimTab:Toggle({
+
+Title = "Preemptive Targeting",
+
+Desc = "Enable preemptive target acquisition for faster reaction",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().aimConfig.PREEMPTIVE_TARGETING = state
+
+end,
+
+})
+
+AimTab:Slider({
+
+Title = "Prediction Lookahead",
+
+Desc = "Frames to look ahead for target prediction (higher = more anticipation)",
+
+Step = 1,
+
+Value = {Min = 1, Max = 10, Default = 3},
+
+Callback = function(value)
+
+getgenv().aimConfig.PREDICTION_LOOKAHEAD = tonumber(value)
 
 end,
 
