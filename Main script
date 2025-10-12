@@ -12,6 +12,8 @@ local RunService = game:GetService("RunService")
 
 local UserInputService = game:GetService("UserInputService")
 
+local PathfindingService = game:GetService("PathfindingService")
+
 local localPlayer = Players.LocalPlayer
 
 
@@ -351,6 +353,11 @@ getgenv().aiAutoPlayConfig = {
 	DODGE_DISTANCE = 30, -- Distance at which to dodge
 	STRAFE_ENABLED = true,
 	CIRCLE_STRAFE = true,
+	-- Pathfinding Settings
+	PATHFINDING_ENABLED = true, -- Use PathfindingService for navigation
+	PATHFINDING_MIN_DISTANCE = 10, -- Minimum distance to use pathfinding
+	PATH_RECOMPUTE_INTERVAL = 0.5, -- How often to recompute paths (seconds)
+	WAYPOINT_REACHED_DISTANCE = 4, -- Distance to consider waypoint reached
 	-- Combat AI Settings
 	COMBAT_ENABLED = true,
 	AUTO_AIM = true,
@@ -1344,8 +1351,14 @@ function AIAutoPlay.new()
 	self.coverPosition = nil
 	self.movementPattern = 1
 	
+	-- Pathfinding state
+	self.currentPath = nil
+	self.currentWaypointIndex = 1
+	self.lastPathCompute = 0
+	
 	-- Cached references
 	self.localPlayer = localPlayer
+	self.pathfindingService = PathfindingService
 	
 	return self
 end
@@ -1486,19 +1499,147 @@ function AIAutoPlay:calculateMovementPosition(myPos, targetPos)
 	return myPos
 end
 
+-- Compute path using PathfindingService
+function AIAutoPlay:computePath(startPos, endPos)
+	local myChar = self.localPlayer.Character
+	if not myChar then return nil end
+	
+	-- Create path object
+	local path = self.pathfindingService:CreatePath({
+		AgentRadius = 2,
+		AgentHeight = 5,
+		AgentCanJump = true,
+		AgentCanClimb = false,
+		WaypointSpacing = 4,
+		Costs = {
+			Water = 20,
+			DangerZone = math.huge -- Avoid danger zones
+		}
+	})
+	
+	-- Compute the path
+	local success, errorMessage = pcall(function()
+		path:ComputeAsync(startPos, endPos)
+	end)
+	
+	if success and path.Status == Enum.PathStatus.Success then
+		return path
+	else
+		-- Path computation failed, return nil to fall back to direct movement
+		return nil
+	end
+end
+
+-- Follow waypoints along the computed path
+function AIAutoPlay:followPath()
+	local myChar = self.localPlayer.Character
+	if not myChar then return false end
+	
+	local hrp = myChar:FindFirstChild("HumanoidRootPart")
+	local humanoid = myChar:FindFirstChildOfClass("Humanoid")
+	if not hrp or not humanoid then return false end
+	
+	local config = getgenv().aiAutoPlayConfig
+	
+	-- Check if we have a valid path
+	if not self.currentPath then return false end
+	
+	local waypoints = self.currentPath:GetWaypoints()
+	if not waypoints or #waypoints == 0 then return false end
+	
+	-- Get current waypoint
+	if self.currentWaypointIndex > #waypoints then
+		-- Reached end of path
+		return true
+	end
+	
+	local currentWaypoint = waypoints[self.currentWaypointIndex]
+	local distanceToWaypoint = (currentWaypoint.Position - hrp.Position).Magnitude
+	
+	-- Check if reached current waypoint
+	if distanceToWaypoint <= config.WAYPOINT_REACHED_DISTANCE then
+		-- Move to next waypoint
+		self.currentWaypointIndex = self.currentWaypointIndex + 1
+		
+		-- If there's a next waypoint, handle jump action
+		if self.currentWaypointIndex <= #waypoints then
+			local nextWaypoint = waypoints[self.currentWaypointIndex]
+			if nextWaypoint.Action == Enum.PathWaypointAction.Jump then
+				humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+			end
+		end
+		
+		return false -- Not finished yet
+	end
+	
+	-- Move towards current waypoint
+	humanoid:MoveTo(currentWaypoint.Position)
+	
+	return false -- Still following path
+end
+
 -- Execute movement towards position
 function AIAutoPlay:moveToPosition(targetPos)
 	local myChar = self.localPlayer.Character
 	if not myChar then return end
 	
+	local hrp = myChar:FindFirstChild("HumanoidRootPart")
 	local humanoid = myChar:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return end
+	if not hrp or not humanoid then return end
 	
-	-- Use Humanoid:MoveTo for natural movement
-	humanoid:MoveTo(targetPos)
+	local config = getgenv().aiAutoPlayConfig
+	local currentTime = tick()
+	local myPos = hrp.Position
+	local distanceToTarget = (targetPos - myPos).Magnitude
+	
+	-- Check if pathfinding is enabled and distance warrants it
+	if config.PATHFINDING_ENABLED and distanceToTarget > config.PATHFINDING_MIN_DISTANCE then
+		-- Use pathfinding for longer distances or recompute periodically
+		local shouldComputePath = false
+		
+		if not self.currentPath then
+			-- No path exists, compute one
+			shouldComputePath = true
+		elseif (currentTime - self.lastPathCompute) > config.PATH_RECOMPUTE_INTERVAL then
+			-- Path is old, recompute
+			shouldComputePath = true
+		elseif self.currentPath.Status ~= Enum.PathStatus.Success then
+			-- Path is invalid
+			shouldComputePath = true
+		end
+		
+		-- Compute new path if needed
+		if shouldComputePath then
+			self.currentPath = self:computePath(myPos, targetPos)
+			self.currentWaypointIndex = 1
+			self.lastPathCompute = currentTime
+		end
+		
+		-- Try to follow the path
+		if self.currentPath then
+			local pathCompleted = self:followPath()
+			
+			-- If path completed or failed, reset
+			if pathCompleted or self.currentPath.Status ~= Enum.PathStatus.Success then
+				self.currentPath = nil
+				self.currentWaypointIndex = 1
+			end
+		else
+			-- Path computation failed, fall back to direct movement
+			humanoid:MoveTo(targetPos)
+		end
+	else
+		-- For short distances or when pathfinding is disabled, use direct movement
+		humanoid:MoveTo(targetPos)
+		-- Clear any existing path
+		if self.currentPath then
+			self.currentPath = nil
+			self.currentWaypointIndex = 1
+		end
+	end
 	
 	-- Random jumping for evasion
-	if getgenv().aiAutoPlayConfig.DODGE_ENABLED then
+	if config.DODGE_ENABLED then
 		if math.random() < 0.1 then -- 10% chance per update
 			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 		end
@@ -3979,6 +4120,27 @@ AITab:Toggle({
 	Value = true,
 	Callback = function(state)
 		getgenv().aiAutoPlayConfig.STRAFE_ENABLED = state
+	end,
+})
+
+AITab:Toggle({
+	Title = "Smart Pathfinding",
+	Desc = "Use PathfindingService to navigate around obstacles",
+	Value = true,
+	Callback = function(state)
+		getgenv().aiAutoPlayConfig.PATHFINDING_ENABLED = state
+		local content = state and "AI will now use smart pathfinding to navigate around obstacles." or "AI will use direct movement only."
+		Windui:Notify({ Title = "Pathfinding", Content = content, Duration = 3, Icon = "route" })
+	end,
+})
+
+AITab:Slider({
+	Title = "Pathfinding Distance",
+	Desc = "Minimum distance to use pathfinding (studs)",
+	Step = 5,
+	Value = {Min = 5, Max = 50, Default = 10},
+	Callback = function(value)
+		getgenv().aiAutoPlayConfig.PATHFINDING_MIN_DISTANCE = tonumber(value)
 	end,
 })
 
