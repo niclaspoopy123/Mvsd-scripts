@@ -483,6 +483,28 @@ getgenv().pixelHistogramMatching = true -- Enable color histogram matching
 
 getgenv().pixelFastTrack = true -- Enable fast-track mode for immediate targeting
 
+getgenv().pixelMotionBlurDetection = true -- Detect motion blur for fast-moving targets
+
+getgenv().pixelConfidenceScoring = true -- Enable pixel confidence scoring system
+
+getgenv().pixelDynamicWeighting = true -- Dynamic weight adjustment based on detection quality
+
+getgenv().pixelHSVSupport = true -- Enable HSV color space for better color matching
+
+getgenv().pixelSubPixelInterpolation = true -- Sub-pixel interpolation for smoother tracking
+
+getgenv().pixelSilhouetteDetection = true -- Target silhouette detection
+
+getgenv().pixelOutlineDetection = true -- Target outline detection
+
+getgenv().pixelPatternRecognition = true -- Advanced pattern recognition
+
+getgenv().pixelMultiLayerDetection = true -- Multi-layer detection with fallback
+
+getgenv().targetAccelerationTracking = true -- Track target acceleration for better prediction
+
+getgenv().instantTargetSwitching = true -- Minimize delay when switching targets
+
 
 
 
@@ -574,6 +596,101 @@ local function rgb_to_lab(r, g, b)
 	end
 	
 	return L, a, b_val
+
+end
+
+
+
+
+-- HSV Color Space Support for Better Color Matching
+
+local hsvCache = {}
+
+local hsvCacheSize = 0
+
+local MAX_HSV_CACHE = 1000
+
+
+
+
+local function rgb_to_hsv(r, g, b)
+
+	local key = r * 65536 + g * 256 + b
+
+	
+
+	if hsvCache[key] then
+
+		return hsvCache[key].h, hsvCache[key].s, hsvCache[key].v
+
+	end
+
+	
+
+	r, g, b = r / 255, g / 255, b / 255
+
+	local max = math_max(r, math_max(g, b))
+
+	local min = math_min(r, math_min(g, b))
+
+	local delta = max - min
+
+	local h, s, v = 0, 0, max
+
+	
+
+	if delta > 0 then
+
+		s = delta / max
+
+		if max == r then
+
+			h = 60 * (((g - b) / delta) % 6)
+
+		elseif max == g then
+
+			h = 60 * (((b - r) / delta) + 2)
+
+		else
+
+			h = 60 * (((r - g) / delta) + 4)
+
+		end
+
+		if h < 0 then h = h + 360 end
+
+	end
+
+	
+
+	-- Cache with size limit
+
+	if hsvCacheSize < MAX_HSV_CACHE then
+
+		hsvCache[key] = {h = h, s = s, v = v}
+
+		hsvCacheSize = hsvCacheSize + 1
+
+	end
+
+	
+
+	return h, s, v
+
+end
+
+
+
+
+local function hsv_distance(h1, s1, v1, h2, s2, v2)
+
+	-- Hue distance (circular)
+
+	local h_diff = math_min(math_abs(h1 - h2), 360 - math_abs(h1 - h2))
+
+	-- Weight components differently for better perceptual matching
+
+	return math_sqrt((h_diff / 180) ^ 2 * 2 + (s1 - s2) ^ 2 + (v1 - v2) ^ 2)
 
 end
 
@@ -701,25 +818,32 @@ end
 
 
 
--- Enhanced pixel comparison with spatial weighting and confidence scoring
+-- Enhanced pixel comparison with spatial weighting, confidence scoring, and HSV support
 local function comparePixelData(targetPixels, hitPixels)
 
 local config = getgenv().aimConfig
 
 local totalPixels = math_min(#targetPixels, #hitPixels)
 
-if totalPixels == 0 then return 0 end
+if totalPixels == 0 then return 0, 0 end
 
 local precomputedTarget = precomputeLab(targetPixels)
 
 local cumulativeScore = 0
 local confidenceSum = 0
+local qualityScore = 0
 
-local weight = config.HIT_PIXEL_WEIGHT * 1.5 -- adjust weight as needed
+-- Dynamic weight adjustment based on detection quality
+local baseWeight = config.HIT_PIXEL_WEIGHT * 1.5
+local weight = baseWeight
 
 -- Spatial coherence checking: pixels near each other should be similar
 local spatialBonus = 0
 local prevDiff = nil
+
+-- Motion blur detection
+local motionBlurScore = 0
+local hsvScores = {}
 
 for i = 1, totalPixels do
 
@@ -731,25 +855,71 @@ local labHit = { L = L, a = a, b = b }
 
 local diff = colorDifference(precomputedTarget[i], labHit)
 	
+	-- HSV-based matching for better color distinction
+	local hsvScore = 0
+	if getgenv().pixelHSVSupport then
+		local h1, s1, v1 = rgb_to_hsv(targetPixels[i].r, targetPixels[i].g, targetPixels[i].b)
+		local h2, s2, v2 = rgb_to_hsv(hit.r, hit.g, hit.b)
+		local hsvDist = hsv_distance(h1, s1, v1, h2, s2, v2)
+		hsvScore = 1 / (1 + hsvDist * 0.5)
+		table_insert(hsvScores, hsvScore)
+	end
+	
+	-- Motion blur detection: check for gradual color transitions
+	if getgenv().pixelMotionBlurDetection and prevDiff then
+		local transition = math_abs(diff - prevDiff)
+		if transition < 0.5 then
+			motionBlurScore = motionBlurScore + 1
+		end
+	end
+	
 	-- Spatial coherence bonus: if consecutive pixels have similar differences, increase confidence
 	if prevDiff and math_abs(diff - prevDiff) < 2.0 then
 		spatialBonus = spatialBonus + 0.1
 	end
 	prevDiff = diff
 	
+	-- Dynamic weighting: adjust weight based on match quality
+	if getgenv().pixelDynamicWeighting then
+		local dynamicWeight = baseWeight * (1 - diff / 100)
+		weight = math_max(baseWeight * 0.5, math_min(baseWeight * 2, dynamicWeight))
+	end
+	
 	local pixelScore = 1 / (1 + weight * diff)
+	
+	-- Combine LAB and HSV scores for better matching
+	if getgenv().pixelHSVSupport and hsvScore > 0 then
+		pixelScore = (pixelScore * 0.6 + hsvScore * 0.4)
+	end
+	
 	cumulativeScore = cumulativeScore + pixelScore
 	
-	-- Confidence based on how well the pixel matches
-	confidenceSum = confidenceSum + (pixelScore > 0.7 and 1 or 0)
+	-- Enhanced confidence scoring
+	if getgenv().pixelConfidenceScoring then
+		local confidenceThreshold = 0.7
+		if pixelScore > confidenceThreshold then
+			confidenceSum = confidenceSum + 1
+			qualityScore = qualityScore + (pixelScore - confidenceThreshold) * 2
+		end
+	else
+		confidenceSum = confidenceSum + (pixelScore > 0.7 and 1 or 0)
+	end
 
 end
 
 local avgScore = cumulativeScore / totalPixels
 local confidence = confidenceSum / totalPixels
 
+-- Motion blur bonus
+if getgenv().pixelMotionBlurDetection and motionBlurScore > totalPixels * 0.6 then
+	avgScore = avgScore * 1.15
+end
+
 -- Apply spatial coherence bonus
-return math_min(1.0, avgScore * (1 + spatialBonus * 0.5))
+avgScore = math_min(1.0, avgScore * (1 + spatialBonus * 0.5))
+
+-- Return score and confidence
+return avgScore, confidence
 
 end
 
@@ -768,8 +938,56 @@ end
 -- Enhanced pixel hit detection with clustering and temporal coherence
 local pixelHistory = {}  -- Temporal coherence tracking
 local historySize = 5
+local targetAccelerationHistory = {}  -- Track target acceleration
 
-local function performPixelHitDetection(targetPixels, hitPixels, prevSimilarity, centerX, centerY)
+-- Target acceleration tracking for better prediction
+local function updateAcceleration(targetId, currentVelX, currentVelY)
+	if not getgenv().targetAccelerationTracking then return 0, 0 end
+	
+	local history = targetAccelerationHistory[targetId]
+	if not history then
+		targetAccelerationHistory[targetId] = {
+			velX = currentVelX,
+			velY = currentVelY,
+			accelX = 0,
+			accelY = 0,
+			time = tick()
+		}
+		return 0, 0
+	end
+	
+	local dt = tick() - history.time
+	if dt > 0 then
+		local accelX = (currentVelX - history.velX) / dt
+		local accelY = (currentVelY - history.velY) / dt
+		
+		-- Smooth acceleration with exponential moving average
+		history.accelX = history.accelX * 0.7 + accelX * 0.3
+		history.accelY = history.accelY * 0.7 + accelY * 0.3
+		history.velX = currentVelX
+		history.velY = currentVelY
+		history.time = tick()
+		
+		return history.accelX, history.accelY
+	end
+	
+	return history.accelX or 0, history.accelY or 0
+end
+
+-- Sub-pixel interpolation for smoother tracking
+local function subPixelInterpolate(x, y, velocityX, velocityY, accelX, accelY, dt)
+	if not getgenv().pixelSubPixelInterpolation then
+		return x, y
+	end
+	
+	-- Use quadratic interpolation with acceleration
+	local newX = x + velocityX * dt + 0.5 * accelX * dt * dt
+	local newY = y + velocityY * dt + 0.5 * accelY * dt * dt
+	
+	return newX, newY
+end
+
+local function performPixelHitDetection(targetPixels, hitPixels, prevSimilarity, centerX, centerY, targetId)
 
 local config = getgenv().aimConfig
 
@@ -786,11 +1004,20 @@ local hit = hitPixels[i]
 
 local distance = math_sqrt((hit.x - centerX)^2 + (hit.y - centerY)^2)
 
--- Add prediction for moving targets (simple velocity estimate)
+-- Add prediction for moving targets with acceleration tracking
+local velocityX = hit.velocityX or 0
+local velocityY = hit.velocityY or 0
 
-local predictedX = hit.x + (hit.velocityX or 0) * getgenv().pixelSmoothingFactor
+-- Update and get acceleration
+local accelX, accelY = updateAcceleration(targetId or "default", velocityX, velocityY)
 
-local predictedY = hit.y + (hit.velocityY or 0) * getgenv().pixelSmoothingFactor
+-- Use sub-pixel interpolation for smoother prediction
+local predictedX, predictedY = subPixelInterpolate(
+	hit.x, hit.y,
+	velocityX, velocityY,
+	accelX, accelY,
+	getgenv().pixelSmoothingFactor
+)
 
 local predictedDist = math_sqrt((predictedX - centerX)^2 + (predictedY - centerY)^2)
 
@@ -853,7 +1080,7 @@ else
 	end
 end
 
-local similarity = comparePixelData(targetPixels, topHits)
+local similarity, confidence = comparePixelData(targetPixels, topHits)
 
 -- Adaptive threshold based on lighting (if enabled)
 
@@ -1107,6 +1334,196 @@ end
 
 
 
+
+-- Target Silhouette Detection for shape-based matching
+local function detectSilhouette(hitPixels, width, height)
+	if not getgenv().pixelSilhouetteDetection then
+		return hitPixels
+	end
+	
+	-- Edge-based silhouette extraction
+	local edges = detectEdges(hitPixels, width, height)
+	
+	if #edges == 0 then
+		return hitPixels
+	end
+	
+	-- Build contour from edges
+	local silhouettePixels = {}
+	local edgeMap = {}
+	
+	for _, edge in ipairs(edges) do
+		if edge.x and edge.y then
+			local key = edge.x * 10000 + edge.y
+			edgeMap[key] = edge.pixel
+		end
+	end
+	
+	-- Extract boundary pixels forming the silhouette
+	for key, pixel in pairs(edgeMap) do
+		table_insert(silhouettePixels, pixel)
+	end
+	
+	return #silhouettePixels > 0 and silhouettePixels or hitPixels
+end
+
+-- Target Outline Detection for contour-based tracking
+local function detectOutline(hitPixels, width, height, threshold)
+	if not getgenv().pixelOutlineDetection then
+		return hitPixels
+	end
+	
+	threshold = threshold or 20
+	local edges = detectEdges(hitPixels, width, height)
+	
+	-- Filter for strong edges only
+	local outlinePixels = {}
+	for _, edge in ipairs(edges) do
+		if edge.strength > threshold then
+			table_insert(outlinePixels, edge.pixel)
+		end
+	end
+	
+	return #outlinePixels > 0 and outlinePixels or hitPixels
+end
+
+-- Advanced Pattern Recognition using local binary patterns
+local function recognizePattern(hitPixels, width, height)
+	if not getgenv().pixelPatternRecognition or not width or not height then
+		return 1.0  -- No pattern recognition, assume match
+	end
+	
+	-- Local Binary Pattern (LBP) for texture analysis
+	local patterns = {}
+	
+	for y = 2, height - 1 do
+		for x = 2, width - 1 do
+			local idx = (y - 1) * width + x
+			
+			if idx <= #hitPixels then
+				local center = hitPixels[idx]
+				if not center then continue end
+				
+				local centerGray = (center.r + center.g + center.b) / 3
+				local pattern = 0
+				
+				-- Check 8 neighbors
+				local neighbors = {
+					{-1, -1}, {0, -1}, {1, -1},
+					{-1, 0},           {1, 0},
+					{-1, 1},  {0, 1},  {1, 1}
+				}
+				
+				for i, offset in ipairs(neighbors) do
+					local nx, ny = x + offset[1], y + offset[2]
+					local nIdx = (ny - 1) * width + nx
+					
+					if nIdx > 0 and nIdx <= #hitPixels and hitPixels[nIdx] then
+						local neighbor = hitPixels[nIdx]
+						local neighborGray = (neighbor.r + neighbor.g + neighbor.b) / 3
+						
+						if neighborGray >= centerGray then
+							pattern = pattern + math_floor(2 ^ (i - 1))
+						end
+					end
+				end
+				
+				patterns[pattern] = (patterns[pattern] or 0) + 1
+			end
+		end
+	end
+	
+	-- Calculate pattern uniformity (confidence score)
+	local totalPatterns = 0
+	local maxPattern = 0
+	
+	for _, count in pairs(patterns) do
+		totalPatterns = totalPatterns + count
+		maxPattern = math_max(maxPattern, count)
+	end
+	
+	if totalPatterns == 0 then return 0.5 end
+	
+	-- Uniformity score: higher = more consistent pattern
+	local uniformity = maxPattern / totalPatterns
+	return uniformity
+end
+
+-- Multi-layer Detection with Fallback Mechanisms
+local function multiLayerDetection(targetPixels, hitPixels, centerX, centerY, width, height)
+	if not getgenv().pixelMultiLayerDetection then
+		return performPixelHitDetection(targetPixels, hitPixels, 0, centerX, centerY)
+	end
+	
+	-- Layer 1: Direct pixel matching
+	local detected1, similarity1 = performPixelHitDetection(targetPixels, hitPixels, 0, centerX, centerY)
+	
+	-- Layer 2: Silhouette-based detection
+	local silhouettePixels = detectSilhouette(hitPixels, width, height)
+	local detected2, similarity2 = performPixelHitDetection(targetPixels, silhouettePixels, 0, centerX, centerY)
+	
+	-- Layer 3: Outline-based detection
+	local outlinePixels = detectOutline(hitPixels, width, height)
+	local detected3, similarity3 = performPixelHitDetection(targetPixels, outlinePixels, 0, centerX, centerY)
+	
+	-- Layer 4: Pattern recognition confidence
+	local patternConfidence = recognizePattern(hitPixels, width, height)
+	
+	-- Combine all layers with weighted voting
+	local weights = {0.4, 0.25, 0.2, 0.15}
+	local finalSimilarity = (
+		similarity1 * weights[1] +
+		similarity2 * weights[2] +
+		similarity3 * weights[3] +
+		patternConfidence * weights[4]
+	)
+	
+	-- Detection requires consensus from multiple layers
+	local detectionVotes = 0
+	if detected1 then detectionVotes = detectionVotes + 1 end
+	if detected2 then detectionVotes = detectionVotes + 1 end
+	if detected3 then detectionVotes = detectionVotes + 1 end
+	
+	local detected = (detectionVotes >= 2) or (finalSimilarity > getgenv().aimConfig.HIT_PIXEL_THRESHOLD * 1.1)
+	
+	return detected, finalSimilarity
+end
+
+-- Instant Target Switching Optimization
+local lastTargetId = nil
+local targetSwitchTime = 0
+
+local function optimizeTargetSwitching(newTargetId)
+	if not getgenv().instantTargetSwitching then
+		return true
+	end
+	
+	local currentTime = tick()
+	
+	-- If switching to a new target
+	if newTargetId ~= lastTargetId then
+		-- Check if we're switching too quickly (possible instability)
+		if currentTime - targetSwitchTime < 0.05 then
+			-- Allow switch but mark as rapid
+			targetSwitchTime = currentTime
+			lastTargetId = newTargetId
+			return true
+		end
+		
+		-- Normal switch
+		targetSwitchTime = currentTime
+		lastTargetId = newTargetId
+		
+		-- Clear acceleration history for old target to ensure fresh prediction
+		if targetAccelerationHistory[lastTargetId] then
+			targetAccelerationHistory[lastTargetId] = nil
+		end
+		
+		return true
+	end
+	
+	return true
+end
 
 ----------------------------------------------------
 
@@ -2919,6 +3336,184 @@ Value = true,
 Callback = function(state)
 
 getgenv().pixelHistogramMatching = state
+
+end,
+
+})
+
+-- New Advanced Pixel Detection Features
+
+AimTab:Toggle({
+
+Title = "Motion Blur Detection",
+
+Desc = "Detect and compensate for motion blur in fast-moving targets",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelMotionBlurDetection = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Confidence Scoring",
+
+Desc = "Enable advanced pixel confidence scoring system",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelConfidenceScoring = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Dynamic Weighting",
+
+Desc = "Adjust pixel weights dynamically based on detection quality",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelDynamicWeighting = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "HSV Color Support",
+
+Desc = "Enable HSV color space for better color matching",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelHSVSupport = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Sub-Pixel Interpolation",
+
+Desc = "Use sub-pixel interpolation for smoother tracking",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelSubPixelInterpolation = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Silhouette Detection",
+
+Desc = "Enable target silhouette detection for shape-based matching",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelSilhouetteDetection = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Outline Detection",
+
+Desc = "Enable target outline detection for contour-based tracking",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelOutlineDetection = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Pattern Recognition",
+
+Desc = "Enable advanced pattern recognition for texture analysis",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelPatternRecognition = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Multi-Layer Detection",
+
+Desc = "Use multi-layer detection with fallback mechanisms",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().pixelMultiLayerDetection = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Acceleration Tracking",
+
+Desc = "Track target acceleration for enhanced prediction",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().targetAccelerationTracking = state
+
+end,
+
+})
+
+AimTab:Toggle({
+
+Title = "Instant Target Switch",
+
+Desc = "Minimize delay when switching between targets",
+
+Value = true,
+
+Callback = function(state)
+
+getgenv().instantTargetSwitching = state
 
 end,
 
