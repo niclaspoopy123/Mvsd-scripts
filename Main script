@@ -383,6 +383,38 @@ getgenv().aiAutoPlayConfig = {
 	MOVEMENT_UPDATE_RATE = 0.05, -- How often to update movement
 }
 
+-- Game Data Analytics Configuration
+getgenv().gameDataAnalytics = {
+	ENABLED = false,
+	MAP_ANALYSIS_INTERVAL = 2.0, -- How often to analyze map (seconds)
+	SAFE_ZONE_UPDATE_RATE = 0.5, -- How often to update safe zones
+	TRACK_WIN_PATTERNS = true, -- Track what strategies win
+	ANALYZE_ENEMY_PATTERNS = true, -- Analyze enemy behavior
+	AUTO_OPTIMIZE_STRATEGY = true, -- Auto-adjust strategy based on data
+}
+
+-- Safe Position Calculator Configuration  
+getgenv().safePositionConfig = {
+	ENABLED = false,
+	AUTO_MOVE_TO_SAFE = false, -- Automatically move to safest position
+	SAFE_DISTANCE_THRESHOLD = 50, -- Minimum safe distance from enemies
+	COVER_SEARCH_RADIUS = 100, -- Radius to search for cover
+	THREAT_WEIGHT = 1.0, -- Weight for threat calculation
+	COVER_WEIGHT = 0.8, -- Weight for cover quality
+	ESCAPE_ROUTE_WEIGHT = 0.6, -- Weight for escape routes
+}
+
+-- Progression Save/Load Configuration
+getgenv().progressionConfig = {
+	ENABLED = false,
+	AUTO_SAVE = true, -- Auto-save on game leave
+	AUTO_LOAD = true, -- Auto-load on game join
+	SAVE_INTERVAL = 30, -- Auto-save every N seconds
+	SAVE_SETTINGS = true, -- Save user settings
+	SAVE_AI_DATA = true, -- Save AI learning data
+	SAVE_STATISTICS = true, -- Save game statistics
+}
+
 
 
 
@@ -1343,6 +1375,467 @@ local mlPredictor = MLPredictor.new()
 
 
 ----------------------------------------------------
+-- Game Data Analytics System - Comprehensive Data Analysis
+----------------------------------------------------
+local GameDataAnalytics = {}
+GameDataAnalytics.__index = GameDataAnalytics
+
+function GameDataAnalytics.new()
+	local self = setmetatable({}, GameDataAnalytics)
+	self.mapData = {
+		safeZones = {},
+		coverPoints = {},
+		highGroundPositions = {},
+		chokePoints = {},
+		escapeRoutes = {},
+	}
+	self.winPatterns = {
+		strategies = {},
+		positions = {},
+		weapons = {},
+	}
+	self.enemyPatterns = {
+		movementStyles = {},
+		combatBehaviors = {},
+		weaknesses = {},
+	}
+	self.gameStatistics = {
+		wins = 0,
+		losses = 0,
+		kills = 0,
+		deaths = 0,
+		averageAccuracy = 0,
+		bestStrategy = "balanced",
+	}
+	return self
+end
+
+-- Analyze entire map for strategic data
+function GameDataAnalytics:analyzeMap()
+	local config = getgenv().gameDataAnalytics
+	if not config.ENABLED then return end
+	
+	local mapParts = {}
+	local coverParts = {}
+	
+	-- Scan workspace for map geometry
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.CanCollide then
+			table_insert(mapParts, obj)
+			
+			-- Identify potential cover
+			if obj.Size.Y > 5 or obj.Size.X > 5 or obj.Size.Z > 5 then
+				table_insert(coverParts, {
+					part = obj,
+					position = obj.Position,
+					size = obj.Size,
+				})
+			end
+		end
+	end
+	
+	self.mapData.coverPoints = coverParts
+	return mapParts
+end
+
+-- Analyze enemy behavior patterns
+function GameDataAnalytics:analyzeEnemyPatterns(enemies)
+	local config = getgenv().gameDataAnalytics
+	if not config.ANALYZE_ENEMY_PATTERNS then return end
+	
+	for _, enemy in ipairs(enemies) do
+		local enemyId = enemy.UserId
+		
+		if not self.enemyPatterns.movementStyles[enemyId] then
+			self.enemyPatterns.movementStyles[enemyId] = {
+				aggressive = 0,
+				defensive = 0,
+				evasive = 0,
+			}
+		end
+		
+		-- Analyze movement speed and patterns
+		if enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
+			local vel = enemy.Character.HumanoidRootPart.Velocity
+			local speed = vel.Magnitude
+			
+			if speed > 20 then
+				self.enemyPatterns.movementStyles[enemyId].aggressive = 
+					self.enemyPatterns.movementStyles[enemyId].aggressive + 1
+			elseif speed < 10 then
+				self.enemyPatterns.movementStyles[enemyId].defensive = 
+					self.enemyPatterns.movementStyles[enemyId].defensive + 1
+			end
+		end
+	end
+end
+
+-- Determine best winning strategy
+function GameDataAnalytics:determineBestStrategy()
+	local config = getgenv().gameDataAnalytics
+	if not config.TRACK_WIN_PATTERNS then return "balanced" end
+	
+	local strategies = self.winPatterns.strategies
+	local bestStrategy = "balanced"
+	local bestScore = 0
+	
+	for strategyName, data in pairs(strategies) do
+		local winRate = data.wins / math_max(1, data.wins + data.losses)
+		if winRate > bestScore then
+			bestScore = winRate
+			bestStrategy = strategyName
+		end
+	end
+	
+	return bestStrategy
+end
+
+-- Record match outcome
+function GameDataAnalytics:recordMatchOutcome(won, strategy, weapon)
+	if won then
+		self.gameStatistics.wins = self.gameStatistics.wins + 1
+	else
+		self.gameStatistics.losses = self.gameStatistics.losses + 1
+	end
+	
+	-- Track strategy performance
+	if not self.winPatterns.strategies[strategy] then
+		self.winPatterns.strategies[strategy] = { wins = 0, losses = 0 }
+	end
+	
+	if won then
+		self.winPatterns.strategies[strategy].wins = 
+			self.winPatterns.strategies[strategy].wins + 1
+	else
+		self.winPatterns.strategies[strategy].losses = 
+			self.winPatterns.strategies[strategy].losses + 1
+	end
+end
+
+-- Auto-optimize strategy based on collected data
+function GameDataAnalytics:autoOptimizeStrategy()
+	local config = getgenv().gameDataAnalytics
+	if not config.AUTO_OPTIMIZE_STRATEGY then return end
+	
+	local bestStrategy = self:determineBestStrategy()
+	
+	-- Update AI config with best strategy
+	if getgenv().aiAutoPlayConfig then
+		getgenv().aiAutoPlayConfig.MOVEMENT_STYLE = bestStrategy
+	end
+end
+
+-- Global game data analytics instance
+local gameAnalytics = GameDataAnalytics.new()
+
+
+----------------------------------------------------
+-- Safe Position Calculator - Find Safest Map Locations
+----------------------------------------------------
+local SafePositionCalculator = {}
+SafePositionCalculator.__index = SafePositionCalculator
+
+function SafePositionCalculator.new()
+	local self = setmetatable({}, SafePositionCalculator)
+	self.safeZones = {}
+	self.lastUpdateTime = 0
+	return self
+end
+
+-- Calculate threat level at a position
+function SafePositionCalculator:calculateThreatAtPosition(position, enemies)
+	local threatLevel = 0
+	
+	for _, enemy in ipairs(enemies) do
+		if enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
+			local enemyPos = enemy.Character.HumanoidRootPart.Position
+			local distance = (enemyPos - position).Magnitude
+			
+			-- Closer enemies = higher threat (inverse distance)
+			if distance < 100 then
+				local threat = (100 - distance) / 100
+				threatLevel = threatLevel + threat
+			end
+		end
+	end
+	
+	return threatLevel
+end
+
+-- Find cover near a position
+function SafePositionCalculator:findNearestCover(position, radius)
+	local config = getgenv().safePositionConfig
+	radius = radius or config.COVER_SEARCH_RADIUS
+	
+	local bestCover = nil
+	local bestDistance = math_huge
+	
+	-- Use map data from analytics
+	for _, coverData in ipairs(gameAnalytics.mapData.coverPoints) do
+		local distance = (coverData.position - position).Magnitude
+		if distance < radius and distance < bestDistance then
+			bestDistance = distance
+			bestCover = coverData
+		end
+	end
+	
+	return bestCover
+end
+
+-- Calculate escape route quality
+function SafePositionCalculator:calculateEscapeRouteQuality(position, enemies)
+	local escapeDirections = {
+		Vector3_new(1, 0, 0),
+		Vector3_new(-1, 0, 0),
+		Vector3_new(0, 0, 1),
+		Vector3_new(0, 0, -1),
+		Vector3_new(1, 0, 1).Unit,
+		Vector3_new(1, 0, -1).Unit,
+		Vector3_new(-1, 0, 1).Unit,
+		Vector3_new(-1, 0, -1).Unit,
+	}
+	
+	local goodEscapeRoutes = 0
+	
+	for _, direction in ipairs(escapeDirections) do
+		local escapePos = position + direction * 20
+		local threatAtEscape = self:calculateThreatAtPosition(escapePos, enemies)
+		
+		if threatAtEscape < 0.3 then
+			goodEscapeRoutes = goodEscapeRoutes + 1
+		end
+	end
+	
+	return goodEscapeRoutes / #escapeDirections
+end
+
+-- Find the safest position on the map
+function SafePositionCalculator:findSafestPosition(myPos, enemies)
+	local config = getgenv().safePositionConfig
+	if not config.ENABLED then return myPos end
+	
+	local currentTime = tick()
+	
+	-- Rate limit updates
+	if currentTime - self.lastUpdateTime < config.SAFE_ZONE_UPDATE_RATE then
+		if self.cachedSafePosition then
+			return self.cachedSafePosition
+		end
+	end
+	
+	self.lastUpdateTime = currentTime
+	
+	-- Sample positions in a grid around current position
+	local bestPosition = myPos
+	local bestScore = -math_huge
+	local sampleRadius = 50
+	local sampleStep = 10
+	
+	for x = -sampleRadius, sampleRadius, sampleStep do
+		for z = -sampleRadius, sampleRadius, sampleStep do
+			local testPos = myPos + Vector3_new(x, 0, z)
+			
+			-- Calculate composite score
+			local threatLevel = self:calculateThreatAtPosition(testPos, enemies)
+			local cover = self:findNearestCover(testPos, 30)
+			local coverQuality = cover and (1.0 / math_max(1, (testPos - cover.position).Magnitude / 10)) or 0
+			local escapeQuality = self:calculateEscapeRouteQuality(testPos, enemies)
+			
+			-- Weighted score
+			local score = 
+				-threatLevel * config.THREAT_WEIGHT +
+				coverQuality * config.COVER_WEIGHT +
+				escapeQuality * config.ESCAPE_ROUTE_WEIGHT
+			
+			if score > bestScore then
+				bestScore = score
+				bestPosition = testPos
+			end
+		end
+	end
+	
+	self.cachedSafePosition = bestPosition
+	return bestPosition
+end
+
+-- Global safe position calculator instance
+local safePositionCalc = SafePositionCalculator.new()
+
+
+----------------------------------------------------
+-- Progression Save/Load System - Preserve Player Data
+----------------------------------------------------
+local ProgressionSystem = {}
+ProgressionSystem.__index = ProgressionSystem
+
+function ProgressionSystem.new()
+	local self = setmetatable({}, ProgressionSystem)
+	self.dataStoreKey = "MVSD_Progression_" .. localPlayer.UserId
+	self.lastSaveTime = 0
+	return self
+end
+
+-- Gather all data to save
+function ProgressionSystem:gatherSaveData()
+	local config = getgenv().progressionConfig
+	local saveData = {
+		version = "1.0",
+		timestamp = tick(),
+	}
+	
+	if config.SAVE_SETTINGS then
+		saveData.settings = {
+			aimConfig = getgenv().aimConfig,
+			mlAutoShootConfig = getgenv().mlAutoShootConfig,
+			aiAutoPlayConfig = getgenv().aiAutoPlayConfig,
+			gameDataAnalytics = getgenv().gameDataAnalytics,
+			safePositionConfig = getgenv().safePositionConfig,
+		}
+	end
+	
+	if config.SAVE_AI_DATA then
+		saveData.aiData = {
+			enemyPatterns = gameAnalytics.enemyPatterns,
+			winPatterns = gameAnalytics.winPatterns,
+			mapData = gameAnalytics.mapData,
+		}
+	end
+	
+	if config.SAVE_STATISTICS then
+		saveData.statistics = gameAnalytics.gameStatistics
+	end
+	
+	return saveData
+end
+
+-- Save progression data
+function ProgressionSystem:save()
+	local config = getgenv().progressionConfig
+	if not config.ENABLED then return false end
+	
+	local currentTime = tick()
+	local saveData = self:gatherSaveData()
+	
+	-- Use HttpService for JSON encoding (Roblox-safe method)
+	local HttpService = game:GetService("HttpService")
+	local success, encoded = pcall(function()
+		return HttpService:JSONEncode(saveData)
+	end)
+	
+	if success then
+		-- Store in DataStore (if available) or use writefile for executors
+		if writefile then
+			local fileName = "MVSD_Progress_" .. localPlayer.UserId .. ".json"
+			writefile(fileName, encoded)
+			self.lastSaveTime = currentTime
+			return true
+		end
+	end
+	
+	return false
+end
+
+-- Load progression data
+function ProgressionSystem:load()
+	local config = getgenv().progressionConfig
+	if not config.ENABLED or not config.AUTO_LOAD then return false end
+	
+	local HttpService = game:GetService("HttpService")
+	
+	-- Try to load from file
+	if readfile and isfile then
+		local fileName = "MVSD_Progress_" .. localPlayer.UserId .. ".json"
+		
+		if isfile(fileName) then
+			local success, content = pcall(readfile, fileName)
+			
+			if success then
+				local decoded
+				success, decoded = pcall(function()
+					return HttpService:JSONDecode(content)
+				end)
+				
+				if success and decoded then
+					self:applyLoadedData(decoded)
+					return true
+				end
+			end
+		end
+	end
+	
+	return false
+end
+
+-- Apply loaded data to game state
+function ProgressionSystem:applyLoadedData(data)
+	if not data then return end
+	
+	-- Restore settings
+	if data.settings then
+		if data.settings.aimConfig then
+			for k, v in pairs(data.settings.aimConfig) do
+				getgenv().aimConfig[k] = v
+			end
+		end
+		if data.settings.mlAutoShootConfig then
+			for k, v in pairs(data.settings.mlAutoShootConfig) do
+				getgenv().mlAutoShootConfig[k] = v
+			end
+		end
+		if data.settings.aiAutoPlayConfig then
+			for k, v in pairs(data.settings.aiAutoPlayConfig) do
+				getgenv().aiAutoPlayConfig[k] = v
+			end
+		end
+		if data.settings.gameDataAnalytics then
+			for k, v in pairs(data.settings.gameDataAnalytics) do
+				getgenv().gameDataAnalytics[k] = v
+			end
+		end
+		if data.settings.safePositionConfig then
+			for k, v in pairs(data.settings.safePositionConfig) do
+				getgenv().safePositionConfig[k] = v
+			end
+		end
+	end
+	
+	-- Restore AI data
+	if data.aiData then
+		if data.aiData.enemyPatterns then
+			gameAnalytics.enemyPatterns = data.aiData.enemyPatterns
+		end
+		if data.aiData.winPatterns then
+			gameAnalytics.winPatterns = data.aiData.winPatterns
+		end
+		if data.aiData.mapData then
+			gameAnalytics.mapData = data.aiData.mapData
+		end
+	end
+	
+	-- Restore statistics
+	if data.statistics then
+		gameAnalytics.gameStatistics = data.statistics
+	end
+end
+
+-- Auto-save on interval
+function ProgressionSystem:startAutoSave()
+	local config = getgenv().progressionConfig
+	if not config.ENABLED or not config.AUTO_SAVE then return end
+	
+	task_spawn(function()
+		while config.ENABLED and config.AUTO_SAVE do
+			task.wait(config.SAVE_INTERVAL)
+			self:save()
+		end
+	end)
+end
+
+-- Global progression system instance
+local progressionSystem = ProgressionSystem.new()
+
+
+----------------------------------------------------
 -- AI Auto-Play System - Intelligent Game Bot
 ----------------------------------------------------
 
@@ -1727,6 +2220,13 @@ function AIAutoPlay:makeDecision()
 	if not humanoid then return end
 	
 	local config = getgenv().aiAutoPlayConfig
+	local enemies = self:getEnemies()
+	
+	-- Analyze enemy patterns (new feature)
+	gameAnalytics:analyzeEnemyPatterns(enemies)
+	
+	-- Auto-optimize strategy based on collected data (new feature)
+	gameAnalytics:autoOptimizeStrategy()
 	
 	-- Calculate threat level
 	self.threatLevel = self:calculateThreatLevel(myPos)
@@ -1748,12 +2248,19 @@ function AIAutoPlay:makeDecision()
 	-- Execute movement
 	if config.MOVEMENT_ENABLED then
 		if self.isRetreating then
-			-- Move away from nearest enemy
-			if self.currentTarget and self.currentTarget.Character then
-				local enemyPos = self.currentTarget.Character.HumanoidRootPart.Position
-				local awayDir = (myPos - enemyPos).Unit
-				local retreatPos = myPos + awayDir * 20
-				self:moveToPosition(retreatPos)
+			-- Use safe position calculator for retreat (new feature)
+			local safeConfig = getgenv().safePositionConfig
+			if safeConfig.ENABLED and safeConfig.AUTO_MOVE_TO_SAFE then
+				local safePos = safePositionCalc:findSafestPosition(myPos, enemies)
+				self:moveToPosition(safePos)
+			else
+				-- Move away from nearest enemy (original behavior)
+				if self.currentTarget and self.currentTarget.Character then
+					local enemyPos = self.currentTarget.Character.HumanoidRootPart.Position
+					local awayDir = (myPos - enemyPos).Unit
+					local retreatPos = myPos + awayDir * 20
+					self:moveToPosition(retreatPos)
+				end
 			end
 		elseif self.currentTarget and self.currentTarget.Character then
 			-- Move according to strategy
@@ -4732,6 +5239,392 @@ end)
 
 
 ------------------------------------------
+-- GAME DATA ANALYTICS TAB
+------------------------------------------
+
+local AnalyticsTab = Window:Tab({ Title = "Game Analytics", Icon = "chart-line", Locked = false })
+
+AnalyticsTab:Section({
+	Title = "Analytics Controls",
+})
+
+AnalyticsTab:Toggle({
+	Title = "Enable Game Analytics",
+	Desc = "Analyze all game data to find the best winning methods",
+	Value = false,
+	Callback = function(state)
+		getgenv().gameDataAnalytics.ENABLED = state
+		
+		local icon = state and "chart-line" or "xmark"
+		Windui:Notify({ 
+			Title = "Game Analytics", 
+			Content = state and "Analytics enabled - collecting game data!" or "Analytics disabled.", 
+			Duration = 3, 
+			Icon = icon 
+		})
+		
+		if state then
+			-- Start map analysis
+			task_spawn(function()
+				while getgenv().gameDataAnalytics.ENABLED do
+					pcall(function()
+						gameAnalytics:analyzeMap()
+					end)
+					task.wait(getgenv().gameDataAnalytics.MAP_ANALYSIS_INTERVAL)
+				end
+			end)
+		end
+	end,
+})
+
+AnalyticsTab:Toggle({
+	Title = "Track Win Patterns",
+	Desc = "Learn which strategies lead to victories",
+	Value = true,
+	Callback = function(state)
+		getgenv().gameDataAnalytics.TRACK_WIN_PATTERNS = state
+	end,
+})
+
+AnalyticsTab:Toggle({
+	Title = "Analyze Enemy Patterns",
+	Desc = "Study enemy behavior and find weaknesses",
+	Value = true,
+	Callback = function(state)
+		getgenv().gameDataAnalytics.ANALYZE_ENEMY_PATTERNS = state
+	end,
+})
+
+AnalyticsTab:Toggle({
+	Title = "Auto-Optimize Strategy",
+	Desc = "Automatically adjust strategy based on collected data",
+	Value = true,
+	Callback = function(state)
+		getgenv().gameDataAnalytics.AUTO_OPTIMIZE_STRATEGY = state
+	end,
+})
+
+AnalyticsTab:Section({
+	Title = "Statistics",
+})
+
+AnalyticsTab:Button({
+	Title = "View Statistics",
+	Desc = "Display collected game statistics",
+	Callback = function()
+		local stats = gameAnalytics.gameStatistics
+		local winRate = stats.wins + stats.losses > 0 and 
+			(stats.wins / (stats.wins + stats.losses) * 100) or 0
+		local kdr = stats.deaths > 0 and (stats.kills / stats.deaths) or stats.kills
+		
+		Windui:Notify({ 
+			Title = "Statistics", 
+			Content = string.format(
+				"Wins: %d | Losses: %d | Win Rate: %.1f%%\nKills: %d | Deaths: %d | K/D: %.2f\nBest Strategy: %s",
+				stats.wins, stats.losses, winRate,
+				stats.kills, stats.deaths, kdr,
+				stats.bestStrategy
+			), 
+			Duration = 8, 
+			Icon = "chart-bar" 
+		})
+	end,
+})
+
+AnalyticsTab:Button({
+	Title = "Reset Statistics",
+	Desc = "Clear all collected statistics",
+	Callback = function()
+		gameAnalytics.gameStatistics = {
+			wins = 0,
+			losses = 0,
+			kills = 0,
+			deaths = 0,
+			averageAccuracy = 0,
+			bestStrategy = "balanced",
+		}
+		Windui:Notify({ 
+			Title = "Statistics Reset", 
+			Content = "All statistics have been cleared.", 
+			Duration = 3, 
+			Icon = "trash" 
+		})
+	end,
+})
+
+
+------------------------------------------
+-- SAFE POSITION TAB
+------------------------------------------
+
+local SafePositionTab = Window:Tab({ Title = "Safe Position", Icon = "shield", Locked = false })
+
+SafePositionTab:Section({
+	Title = "Safe Position Controls",
+})
+
+SafePositionTab:Toggle({
+	Title = "Enable Safe Position Calculator",
+	Desc = "Calculate the safest place on the map",
+	Value = false,
+	Callback = function(state)
+		getgenv().safePositionConfig.ENABLED = state
+		
+		local icon = state and "shield" or "xmark"
+		Windui:Notify({ 
+			Title = "Safe Position", 
+			Content = state and "Safe position calculator enabled!" or "Safe position calculator disabled.", 
+			Duration = 3, 
+			Icon = icon 
+		})
+	end,
+})
+
+SafePositionTab:Toggle({
+	Title = "Auto-Move to Safe Position",
+	Desc = "Automatically move to the safest position when threatened",
+	Value = false,
+	Callback = function(state)
+		getgenv().safePositionConfig.AUTO_MOVE_TO_SAFE = state
+	end,
+})
+
+SafePositionTab:Section({
+	Title = "Position Calculation Settings",
+})
+
+SafePositionTab:Slider({
+	Title = "Safe Distance Threshold",
+	Desc = "Minimum safe distance from enemies (studs)",
+	Step = 5,
+	Value = {Min = 20, Max = 100, Default = 50},
+	Callback = function(value)
+		getgenv().safePositionConfig.SAFE_DISTANCE_THRESHOLD = tonumber(value)
+	end,
+})
+
+SafePositionTab:Slider({
+	Title = "Cover Search Radius",
+	Desc = "Radius to search for cover (studs)",
+	Step = 10,
+	Value = {Min = 30, Max = 200, Default = 100},
+	Callback = function(value)
+		getgenv().safePositionConfig.COVER_SEARCH_RADIUS = tonumber(value)
+	end,
+})
+
+SafePositionTab:Slider({
+	Title = "Threat Weight",
+	Desc = "How much to prioritize distance from enemies",
+	Step = 0.1,
+	Value = {Min = 0, Max = 2, Default = 1.0},
+	Callback = function(value)
+		getgenv().safePositionConfig.THREAT_WEIGHT = tonumber(value)
+	end,
+})
+
+SafePositionTab:Slider({
+	Title = "Cover Weight",
+	Desc = "How much to prioritize nearby cover",
+	Step = 0.1,
+	Value = {Min = 0, Max = 2, Default = 0.8},
+	Callback = function(value)
+		getgenv().safePositionConfig.COVER_WEIGHT = tonumber(value)
+	end,
+})
+
+SafePositionTab:Slider({
+	Title = "Escape Route Weight",
+	Desc = "How much to prioritize good escape routes",
+	Step = 0.1,
+	Value = {Min = 0, Max = 2, Default = 0.6},
+	Callback = function(value)
+		getgenv().safePositionConfig.ESCAPE_ROUTE_WEIGHT = tonumber(value)
+	end,
+})
+
+SafePositionTab:Button({
+	Title = "Find Safe Position Now",
+	Desc = "Calculate and display the safest position",
+	Callback = function()
+		if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			Windui:Notify({ 
+				Title = "Error", 
+				Content = "Character not found!", 
+				Duration = 3, 
+				Icon = "xmark" 
+			})
+			return
+		end
+		
+		local myPos = localPlayer.Character.HumanoidRootPart.Position
+		local enemies = {}
+		
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				if not getgenv().teamCheckKill or not localPlayer.Team or player.Team ~= localPlayer.Team then
+					table_insert(enemies, player)
+				end
+			end
+		end
+		
+		local safePos = safePositionCalc:findSafestPosition(myPos, enemies)
+		local distance = (safePos - myPos).Magnitude
+		
+		Windui:Notify({ 
+			Title = "Safe Position Found", 
+			Content = string.format(
+				"Safest position: %.1f, %.1f, %.1f\nDistance: %.1f studs",
+				safePos.X, safePos.Y, safePos.Z, distance
+			), 
+			Duration = 5, 
+			Icon = "map-pin" 
+		})
+	end,
+})
+
+
+------------------------------------------
+-- PROGRESSION SYSTEM TAB
+------------------------------------------
+
+local ProgressionTab = Window:Tab({ Title = "Progression", Icon = "save", Locked = false })
+
+ProgressionTab:Section({
+	Title = "Progression Controls",
+})
+
+ProgressionTab:Toggle({
+	Title = "Enable Progression System",
+	Desc = "Save and load your progress, settings, and learned data",
+	Value = false,
+	Callback = function(state)
+		getgenv().progressionConfig.ENABLED = state
+		
+		local icon = state and "save" or "xmark"
+		Windui:Notify({ 
+			Title = "Progression System", 
+			Content = state and "Progression system enabled!" or "Progression system disabled.", 
+			Duration = 3, 
+			Icon = icon 
+		})
+		
+		if state then
+			-- Auto-load on enable
+			if getgenv().progressionConfig.AUTO_LOAD then
+				local loaded = progressionSystem:load()
+				if loaded then
+					Windui:Notify({ 
+						Title = "Progress Loaded", 
+						Content = "Your saved progress has been restored!", 
+						Duration = 3, 
+						Icon = "check" 
+					})
+				end
+			end
+			
+			-- Start auto-save
+			progressionSystem:startAutoSave()
+		end
+	end,
+})
+
+ProgressionTab:Toggle({
+	Title = "Auto-Save",
+	Desc = "Automatically save progress periodically",
+	Value = true,
+	Callback = function(state)
+		getgenv().progressionConfig.AUTO_SAVE = state
+		if state then
+			progressionSystem:startAutoSave()
+		end
+	end,
+})
+
+ProgressionTab:Toggle({
+	Title = "Auto-Load on Join",
+	Desc = "Automatically load saved progress when joining",
+	Value = true,
+	Callback = function(state)
+		getgenv().progressionConfig.AUTO_LOAD = state
+	end,
+})
+
+ProgressionTab:Section({
+	Title = "Save Options",
+})
+
+ProgressionTab:Toggle({
+	Title = "Save Settings",
+	Desc = "Include user settings in save data",
+	Value = true,
+	Callback = function(state)
+		getgenv().progressionConfig.SAVE_SETTINGS = state
+	end,
+})
+
+ProgressionTab:Toggle({
+	Title = "Save AI Learning Data",
+	Desc = "Include AI patterns and analytics in save data",
+	Value = true,
+	Callback = function(state)
+		getgenv().progressionConfig.SAVE_AI_DATA = state
+	end,
+})
+
+ProgressionTab:Toggle({
+	Title = "Save Statistics",
+	Desc = "Include game statistics in save data",
+	Value = true,
+	Callback = function(state)
+		getgenv().progressionConfig.SAVE_STATISTICS = state
+	end,
+})
+
+ProgressionTab:Slider({
+	Title = "Auto-Save Interval",
+	Desc = "How often to auto-save (seconds)",
+	Step = 5,
+	Value = {Min = 10, Max = 300, Default = 30},
+	Callback = function(value)
+		getgenv().progressionConfig.SAVE_INTERVAL = tonumber(value)
+	end,
+})
+
+ProgressionTab:Section({
+	Title = "Manual Controls",
+})
+
+ProgressionTab:Button({
+	Title = "Save Now",
+	Desc = "Manually save your progress",
+	Callback = function()
+		local success = progressionSystem:save()
+		Windui:Notify({ 
+			Title = success and "Save Successful" or "Save Failed", 
+			Content = success and "Your progress has been saved!" or "Failed to save progress. Check console for errors.", 
+			Duration = 3, 
+			Icon = success and "check" or "xmark" 
+		})
+	end,
+})
+
+ProgressionTab:Button({
+	Title = "Load Progress",
+	Desc = "Manually load saved progress",
+	Callback = function()
+		local success = progressionSystem:load()
+		Windui:Notify({ 
+			Title = success and "Load Successful" or "Load Failed", 
+			Content = success and "Your progress has been restored!" or "No saved progress found or load failed.", 
+			Duration = 3, 
+			Icon = success and "check" or "xmark" 
+		})
+	end,
+})
+
+
+------------------------------------------
 
 -- ANIMATIONS TAB (Added more animations)
 
@@ -5632,6 +6525,49 @@ Desc = "Developer of WindUI, the UI library used by this script.",
 Window:SelectTab(1)
 
 
+
+
+--------------------------------------------------------------------------------
+-- Initialize New Systems
+--------------------------------------------------------------------------------
+
+-- Auto-load progression on script start
+if getgenv().progressionConfig.ENABLED and getgenv().progressionConfig.AUTO_LOAD then
+	task_spawn(function()
+		task.wait(2) -- Wait for game to fully load
+		local loaded = progressionSystem:load()
+		if loaded then
+			print("[MVSD] Progress loaded successfully")
+		end
+	end)
+end
+
+-- Save on game leave
+game:BindToClose(function()
+	if getgenv().progressionConfig.ENABLED and getgenv().progressionConfig.AUTO_SAVE then
+		progressionSystem:save()
+		print("[MVSD] Progress saved on game leave")
+	end
+end)
+
+-- Save when player leaves
+Players.PlayerRemoving:Connect(function(player)
+	if player == localPlayer then
+		if getgenv().progressionConfig.ENABLED and getgenv().progressionConfig.AUTO_SAVE then
+			progressionSystem:save()
+			print("[MVSD] Progress saved on player leave")
+		end
+	end
+end)
+
+-- Initialize map analysis if analytics enabled
+if getgenv().gameDataAnalytics.ENABLED then
+	task_spawn(function()
+		task.wait(3) -- Wait for map to load
+		gameAnalytics:analyzeMap()
+		print("[MVSD] Map analysis complete")
+	end)
+end
 
 
 --------------------------------------------------------------------------------
