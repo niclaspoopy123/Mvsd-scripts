@@ -2497,6 +2497,36 @@ end,
 
 local KillTab = Window:Tab({ Title = "Auto Kill", Icon = "skull", Locked = false })
 
+-- Kill all function implementation
+local function performKillAll(weaponType)
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= localPlayer and player.Character then
+			-- Check team if enabled
+			if getgenv().teamCheckKill then
+				if localPlayer.Team and player.Team and localPlayer.Team == player.Team then
+					continue
+				end
+			end
+			
+			local enemyRoot = player.Character:FindFirstChild("HumanoidRootPart")
+			if enemyRoot then
+				-- Fire the appropriate remote
+				if weaponType == "gun" then
+					local gunRemote = ReplicatedStorage:FindFirstChild("GunShoot")
+					if gunRemote then
+						gunRemote:FireServer()
+					end
+				elseif weaponType == "knife" then
+					local knifeRemote = ReplicatedStorage:FindFirstChild("KnifeShoot") or ReplicatedStorage.Remotes:FindFirstChild("ThrowStart")
+					if knifeRemote then
+						knifeRemote:FireServer()
+					end
+				end
+			end
+		end
+	end
+end
+
 local function triggerKill(origin, loopState)
 
 getgenv().killSpeed = 0
@@ -2515,12 +2545,17 @@ getgenv().killLoop.gun = loopState
 
 end
 
-local success = loadModule("mvsd/killall.lua")
-
-if not success then
-
-warn("Failed to load killall module")
-
+-- Execute kill immediately if not looping
+if not loopState then
+	performKillAll(origin)
+else
+	-- Start loop
+	task_spawn(function()
+		while getgenv().killLoop[origin] do
+			performKillAll(origin)
+			task.wait(0.05) -- Small delay to prevent server overload
+		end
+	end)
 end
 
 end
@@ -2933,11 +2968,34 @@ end,
 
 })
 
+-- Hook cooldown functions once at initialization (prevent lag)
+local cooldownHooksInitialized = false
+local function initializeCooldownHooks()
+	if cooldownHooksInitialized then return end
+	cooldownHooksInitialized = true
+	
+	-- Universal cooldown adjustment for tools (run once)
+	for _, obj in pairs(getgc()) do
+		if type(obj) == "function" and islclosure(obj) then
+			local info = debug.getinfo(obj)
+			if info.name and info.name:lower():find("cooldown") then
+				hookfunction(obj, function(...)
+					if getgenv().noAbilityCooldown then
+						return true
+					else
+						return false
+					end
+				end)
+			end
+		end
+	end
+end
+
 MiscTab:Toggle({
 
 Title = "No Ability Cooldown",
 
-Desc = "Set all ability cooldowns to 0 (client-side bypass)",
+Desc = "Set all ability cooldowns to 0 (no lag, instant abilities)",
 
 Value = false,
 
@@ -2945,13 +3003,18 @@ Callback = function(state)
 
 getgenv().noAbilityCooldown = state
 
+-- Initialize hooks on first enable
+if state then
+	initializeCooldownHooks()
+end
+
 local icon = state and "bolt" or "xmark"
 
 Windui:Notify({
 
 Title = "No Ability Cooldown",
 
-Content = state and "Ability cooldowns disabled (client-side)." or "Ability cooldowns restored.",
+Content = state and "Ability cooldowns disabled (instant abilities, no lag)." or "Ability cooldowns restored.",
 
 Duration = 3,
 
@@ -2977,13 +3040,13 @@ for _, ability in ipairs(abilityFolder:GetChildren()) do
 
 if ability:IsA("NumberValue") and ability.Name:lower():find("cooldown") then
 
-ability.Value = getgenv().cooldownMultiplier * (ability.OriginalValue or 1) -- Assuming original value stored or default
+ability.Value = 0
 
 end
 
 if ability:GetAttribute("Cooldown") then
 
-ability:SetAttribute("Cooldown", getgenv().cooldownMultiplier * (ability:GetAttribute("OriginalCooldown") or 1))
+ability:SetAttribute("Cooldown", 0)
 
 end
 
@@ -2991,7 +3054,7 @@ end
 
 end
 
--- Also set tool cooldowns to adjusted value
+-- Also set tool cooldowns to 0
 
 for _, tool in ipairs(localPlayer.Backpack:GetChildren()) do
 
@@ -2999,21 +3062,21 @@ if tool:IsA("Tool") then
 
 if tool:FindFirstChild("Cooldown") and tool.Cooldown:IsA("NumberValue") then
 
-tool.Cooldown.Value = getgenv().cooldownMultiplier * (tool.Cooldown.OriginalValue or 1)
+tool.Cooldown.Value = 0
 
 end
 
 if tool:GetAttribute("Cooldown") then
 
-tool:SetAttribute("Cooldown", getgenv().cooldownMultiplier * (tool:GetAttribute("OriginalCooldown") or 1))
+tool:SetAttribute("Cooldown", 0)
 
 end
 
--- Set CanUse to true if multiplier is low
+-- Set CanUse to true
 
 if tool:FindFirstChild("CanUse") then
 
-tool.CanUse.Value = getgenv().cooldownMultiplier < 0.5
+tool.CanUse.Value = true
 
 end
 
@@ -3029,43 +3092,21 @@ if tool:IsA("Tool") then
 
 if tool:FindFirstChild("Cooldown") and tool.Cooldown:IsA("NumberValue") then
 
-tool.Cooldown.Value = getgenv().cooldownMultiplier * (tool.Cooldown.OriginalValue or 1)
+tool.Cooldown.Value = 0
 
 end
 
 if tool:GetAttribute("Cooldown") then
 
-tool:SetAttribute("Cooldown", getgenv().cooldownMultiplier * (tool:GetAttribute("OriginalCooldown") or 1))
+tool:SetAttribute("Cooldown", 0)
 
 end
 
 if tool:FindFirstChild("CanUse") then
 
-tool.CanUse.Value = getgenv().cooldownMultiplier < 0.5
+tool.CanUse.Value = true
 
 end
-
-end
-
-end
-
-end
-
--- Universal cooldown adjustment for tools
-
-for _, obj in pairs(getgc()) do
-
-if type(obj) == "function" and islclosure(obj) then
-
-local info = debug.getinfo(obj)
-
-if info.name and info.name:lower():find("cooldown") then
-
-hookfunction(obj, function(...)
-
-return getgenv().cooldownMultiplier == 0
-
-end)
 
 end
 
