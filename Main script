@@ -305,6 +305,12 @@ getgenv().espTeamMates = true
 
 getgenv().espEnemies = true
 
+getgenv().espShowHitboxes = false
+
+getgenv().espHitboxTransparency = 0.7
+
+getgenv().espHitboxColor = Color3_fromRGB(255, 255, 255)
+
 getgenv().killButton = { gun = false, knife = false }
 
 getgenv().killLoop = { gun = false, knife = false }
@@ -3588,6 +3594,146 @@ end,
 
 })
 
+EspTab:Toggle({
+
+Title = "Show Hitboxes",
+
+Desc = "Display transparent white hitboxes around players",
+
+Value = false,
+
+Callback = function(state)
+
+getgenv().espShowHitboxes = state
+
+end,
+
+})
+
+EspTab:Slider({
+
+Title = "Hitbox Transparency",
+
+Desc = "Set the transparency of hitboxes (0 = opaque, 1 = invisible)",
+
+Step = 0.1,
+
+Value = {Min = 0, Max = 1, Default = 0.7},
+
+Callback = function(value)
+
+getgenv().espHitboxTransparency = tonumber(value)
+
+end,
+
+})
+
+-- Hitbox drawing functionality
+local hitboxes = {}
+
+local function createHitbox(character)
+local hrp = character:FindFirstChild("HumanoidRootPart")
+if not hrp then return nil end
+
+-- Create a BoxHandleAdornment for the hitbox
+local box = Instance_new("BoxHandleAdornment")
+box.Name = "ESPHitbox"
+box.Adornee = hrp
+box.AlwaysOnTop = true
+box.ZIndex = 1
+box.Size = hrp.Size + Vector3_new(0.5, 1, 0.5) -- Slightly larger than character
+box.Color3 = getgenv().espHitboxColor
+box.Transparency = getgenv().espHitboxTransparency
+box.Parent = hrp
+
+return box
+end
+
+local function updateHitboxes()
+if not getgenv().espShowHitboxes then
+-- Remove all hitboxes
+for player, box in pairs(hitboxes) do
+if box and box.Parent then
+box:Destroy()
+end
+hitboxes[player] = nil
+end
+return
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+if player ~= localPlayer and player.Character then
+local showPlayer = false
+if player.Team and localPlayer.Team then
+if player.Team == localPlayer.Team then
+showPlayer = getgenv().espTeamMates
+else
+showPlayer = getgenv().espEnemies
+end
+else
+showPlayer = getgenv().espEnemies
+end
+
+if showPlayer then
+if not hitboxes[player] or not hitboxes[player].Parent then
+hitboxes[player] = createHitbox(player.Character)
+else
+-- Update transparency and color
+hitboxes[player].Transparency = getgenv().espHitboxTransparency
+hitboxes[player].Color3 = getgenv().espHitboxColor
+end
+else
+if hitboxes[player] and hitboxes[player].Parent then
+hitboxes[player]:Destroy()
+hitboxes[player] = nil
+end
+end
+else
+if hitboxes[player] and hitboxes[player].Parent then
+hitboxes[player]:Destroy()
+hitboxes[player] = nil
+end
+end
+end
+end
+
+-- Update hitboxes regularly
+RunService.Heartbeat:Connect(function()
+pcall(updateHitboxes)
+end)
+
+-- Clean up hitboxes when players leave
+Players.PlayerRemoving:Connect(function(player)
+if hitboxes[player] and hitboxes[player].Parent then
+hitboxes[player]:Destroy()
+hitboxes[player] = nil
+end
+end)
+
+-- Handle character respawns
+Players.PlayerAdded:Connect(function(player)
+player.CharacterAdded:Connect(function()
+task_wait(0.5)
+if hitboxes[player] and hitboxes[player].Parent then
+hitboxes[player]:Destroy()
+end
+hitboxes[player] = nil
+end)
+end)
+
+-- Setup for existing players
+for _, player in ipairs(Players:GetPlayers()) do
+if player ~= localPlayer then
+player.CharacterAdded:Connect(function()
+task_wait(0.5)
+if hitboxes[player] and hitboxes[player].Parent then
+hitboxes[player]:Destroy()
+end
+hitboxes[player] = nil
+end)
+end
+end
+
 
 
 
@@ -5216,6 +5362,10 @@ end
 
 if getgenv().enableJumpPowerChanger then
 
+-- Modern Roblox uses JumpHeight by default, but we need to enable JumpPower mode
+if humanoid.UseJumpPower == false then
+humanoid.UseJumpPower = true
+end
 humanoid.JumpPower = getgenv().jumpPower or 50
 
 end
@@ -5224,6 +5374,23 @@ end
 
 end
 
+end)
+
+-- Handle character respawn to reapply speed and jump settings
+localPlayer.CharacterAdded:Connect(function(character)
+task_wait(0.5) -- Wait for character to fully load
+local humanoid = character:WaitForChild("Humanoid", 5)
+if humanoid then
+if getgenv().enableSpeedChanger then
+humanoid.WalkSpeed = getgenv().walkSpeed or 16
+end
+if getgenv().enableJumpPowerChanger then
+if humanoid.UseJumpPower == false then
+humanoid.UseJumpPower = true
+end
+humanoid.JumpPower = getgenv().jumpPower or 50
+end
+end
 end)
 
 
