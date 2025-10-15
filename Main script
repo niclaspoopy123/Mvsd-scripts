@@ -511,6 +511,17 @@ getgenv().targetAccelerationTracking = true -- Track target acceleration for bet
 
 getgenv().instantTargetSwitching = true -- Minimize delay when switching targets
 
+-- PC Aim Assist Configuration
+getgenv().pcAimAssist = {
+	ENABLED = false,
+	MOUSE_TRACKING = false,
+	HITBOX_EXPANSION = 0, -- 0-30 studs
+	AUTO_RELOAD_PER_ROUND = false,
+	SMOOTHNESS = 0.5, -- 0.1-1.0, higher = smoother
+	SENSITIVITY = 1.0, -- Mouse tracking sensitivity multiplier
+	TRACKING_DISTANCE = 500, -- Maximum distance to track enemies
+}
+
 
 
 
@@ -1532,6 +1543,200 @@ local function optimizeTargetSwitching(newTargetId)
 end
 
 ----------------------------------------------------
+-- PC Aim Assist Implementation
+----------------------------------------------------
+
+local Mouse = localPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+local currentTarget = nil
+local hitboxParts = {} -- Store expanded hitbox parts
+local roundConnection = nil
+
+-- Function to get the nearest enemy player
+local function getNearestEnemy()
+	local nearestPlayer = nil
+	local shortestDistance = getgenv().pcAimAssist.TRACKING_DISTANCE
+	
+	if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		return nil
+	end
+	
+	local myPos = localPlayer.Character.HumanoidRootPart.Position
+	
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			-- Check team
+			if getgenv().teamCheckKill and localPlayer.Team and player.Team == localPlayer.Team then
+				continue
+			end
+			
+			local enemyPos = player.Character.HumanoidRootPart.Position
+			local distance = (enemyPos - myPos).Magnitude
+			
+			if distance < shortestDistance then
+				shortestDistance = distance
+				nearestPlayer = player
+			end
+		end
+	end
+	
+	return nearestPlayer
+end
+
+-- Function to expand hitboxes
+local function expandHitbox(character, expansion)
+	if not character or expansion <= 0 then return end
+	
+	local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+	if not humanoidRootPart then return end
+	
+	-- Create or update expanded hitbox
+	local hitboxKey = character.Name
+	
+	if hitboxParts[hitboxKey] then
+		-- Update existing hitbox
+		hitboxParts[hitboxKey].Size = Vector3_new(
+			2 + expansion,
+			5 + expansion,
+			1 + expansion
+		)
+	else
+		-- Create new expanded hitbox
+		local hitbox = Instance_new("Part")
+		hitbox.Name = "ExpandedHitbox"
+		hitbox.Size = Vector3_new(
+			2 + expansion,
+			5 + expansion,
+			1 + expansion
+		)
+		hitbox.Transparency = 1
+		hitbox.CanCollide = false
+		hitbox.Anchored = false
+		hitbox.Parent = character
+		
+		-- Weld to HumanoidRootPart
+		local weld = Instance_new("WeldConstraint")
+		weld.Part0 = humanoidRootPart
+		weld.Part1 = hitbox
+		weld.Parent = hitbox
+		
+		hitboxParts[hitboxKey] = hitbox
+	end
+end
+
+-- Function to remove expanded hitboxes
+local function removeExpandedHitboxes()
+	for _, hitbox in pairs(hitboxParts) do
+		if hitbox and hitbox.Parent then
+			hitbox:Destroy()
+		end
+	end
+	hitboxParts = {}
+end
+
+-- Mouse tracking update function
+local lastTrackTime = 0
+local trackCooldown = 0.016 -- ~60 FPS
+
+local function updateMouseTracking(dt)
+	if not getgenv().pcAimAssist.ENABLED or not getgenv().pcAimAssist.MOUSE_TRACKING then
+		currentTarget = nil
+		return
+	end
+	
+	lastTrackTime = lastTrackTime + dt
+	if lastTrackTime < trackCooldown then return end
+	lastTrackTime = 0
+	
+	-- Get nearest enemy
+	local target = getNearestEnemy()
+	
+	if target and target.Character then
+		currentTarget = target
+		
+		local targetPart = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+		if not targetPart then return end
+		
+		-- Calculate target position
+		local targetPos = targetPart.Position
+		
+		-- Smooth camera movement
+		local currentCam = Camera.CFrame
+		local targetCFrame = CFrame.new(currentCam.Position, targetPos)
+		
+		-- Apply smoothness
+		local smoothness = getgenv().pcAimAssist.SMOOTHNESS
+		local sensitivity = getgenv().pcAimAssist.SENSITIVITY
+		
+		Camera.CFrame = currentCam:Lerp(targetCFrame, (1 - smoothness) * sensitivity * dt * 60)
+	else
+		currentTarget = nil
+	end
+end
+
+-- Hitbox expansion update function
+local function updateHitboxExpansion()
+	if not getgenv().pcAimAssist.ENABLED or getgenv().pcAimAssist.HITBOX_EXPANSION <= 0 then
+		removeExpandedHitboxes()
+		return
+	end
+	
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= localPlayer and player.Character then
+			-- Check team
+			if getgenv().teamCheckKill and localPlayer.Team and player.Team == localPlayer.Team then
+				continue
+			end
+			
+			expandHitbox(player.Character, getgenv().pcAimAssist.HITBOX_EXPANSION)
+		end
+	end
+end
+
+-- Auto-reload per round functionality
+local function setupAutoReload()
+	if not getgenv().pcAimAssist.AUTO_RELOAD_PER_ROUND then
+		if roundConnection then
+			roundConnection:Disconnect()
+			roundConnection = nil
+		end
+		return
+	end
+	
+	-- Monitor for round changes
+	if roundConnection then roundConnection:Disconnect() end
+	
+	roundConnection = RunService.Heartbeat:Connect(function()
+		if not getgenv().pcAimAssist.AUTO_RELOAD_PER_ROUND then
+			if roundConnection then
+				roundConnection:Disconnect()
+				roundConnection = nil
+			end
+			return
+		end
+		
+		-- Check if player has Match attribute (indicates in-game)
+		if localPlayer:GetAttribute("Match") then
+			-- Re-enable aim assist if it was disabled
+			if not getgenv().pcAimAssist.ENABLED then
+				getgenv().pcAimAssist.ENABLED = true
+				getgenv().pcAimAssist.MOUSE_TRACKING = true
+			end
+		end
+	end)
+end
+
+-- Clean up when disabled
+local function cleanupAimAssist()
+	removeExpandedHitboxes()
+	currentTarget = nil
+	if roundConnection then
+		roundConnection:Disconnect()
+		roundConnection = nil
+	end
+end
+
+----------------------------------------------------
 
 -- Ultra-Fast Reaction using Heartbeat (frame update)
 
@@ -1543,6 +1748,12 @@ local cacheCleanupInterval = 30 -- Clear cache every 30 seconds
 RunService.Heartbeat:Connect(function(dt)
 
 -- Additional per-frame actions can be added here if needed.
+
+-- Update PC Aim Assist
+if getgenv().pcAimAssist.ENABLED then
+	updateMouseTracking(dt)
+	updateHitboxExpansion()
+end
 
 -- Periodic cache cleanup to prevent memory bloat
 cacheCleanupTimer = cacheCleanupTimer + dt
@@ -3523,6 +3734,130 @@ getgenv().instantTargetSwitching = state
 
 end,
 
+})
+
+-- PC Aim Assist Section
+AimTab:Section({
+	Title = "PC Aim Assist",
+})
+
+AimTab:Toggle({
+	Title = "Enable PC Aim Assist",
+	Desc = "Enable PC aim assist with mouse tracking and hitbox expansion",
+	Value = false,
+	Callback = function(state)
+		getgenv().pcAimAssist.ENABLED = state
+		
+		if state then
+			Windui:Notify({
+				Title = "PC Aim Assist",
+				Content = "PC Aim Assist enabled! Mouse will track nearest enemy.",
+				Duration = 3,
+				Icon = "target"
+			})
+			setupAutoReload()
+		else
+			cleanupAimAssist()
+			Windui:Notify({
+				Title = "PC Aim Assist",
+				Content = "PC Aim Assist disabled.",
+				Duration = 3,
+				Icon = "xmark"
+			})
+		end
+	end,
+})
+
+AimTab:Toggle({
+	Title = "Mouse Tracking",
+	Desc = "Automatically track enemy players with mouse/camera",
+	Value = false,
+	Callback = function(state)
+		getgenv().pcAimAssist.MOUSE_TRACKING = state
+		
+		local icon = state and "mouse" or "xmark"
+		Windui:Notify({
+			Title = "Mouse Tracking",
+			Content = state and "Mouse tracking enabled!" or "Mouse tracking disabled.",
+			Duration = 2,
+			Icon = icon
+		})
+	end,
+})
+
+AimTab:Toggle({
+	Title = "Auto-Reload Per Round",
+	Desc = "Automatically re-enable aim assist at the start of each round",
+	Value = false,
+	Callback = function(state)
+		getgenv().pcAimAssist.AUTO_RELOAD_PER_ROUND = state
+		setupAutoReload()
+		
+		local icon = state and "refresh-cw" or "xmark"
+		Windui:Notify({
+			Title = "Auto-Reload",
+			Content = state and "Aim assist will reload automatically each round!" or "Auto-reload disabled.",
+			Duration = 2,
+			Icon = icon
+		})
+	end,
+})
+
+AimTab:Slider({
+	Title = "Hitbox Expansion",
+	Desc = "Expand enemy hitboxes (0-30 studs, 0 = disabled)",
+	Step = 1,
+	Value = {Min = 0, Max = 30, Default = 0},
+	Callback = function(value)
+		getgenv().pcAimAssist.HITBOX_EXPANSION = tonumber(value)
+		
+		if value > 0 then
+			Windui:Notify({
+				Title = "Hitbox Expansion",
+				Content = string.format("Hitboxes expanded by %d studs", value),
+				Duration = 2,
+				Icon = "maximize"
+			})
+		else
+			removeExpandedHitboxes()
+			Windui:Notify({
+				Title = "Hitbox Expansion",
+				Content = "Hitbox expansion disabled",
+				Duration = 2,
+				Icon = "minimize"
+			})
+		end
+	end,
+})
+
+AimTab:Slider({
+	Title = "Tracking Smoothness",
+	Desc = "How smooth the mouse tracking is (0.1 = instant, 1.0 = very smooth)",
+	Step = 0.05,
+	Value = {Min = 0.1, Max = 1.0, Default = 0.5},
+	Callback = function(value)
+		getgenv().pcAimAssist.SMOOTHNESS = tonumber(value)
+	end,
+})
+
+AimTab:Slider({
+	Title = "Mouse Sensitivity",
+	Desc = "Tracking speed multiplier (higher = faster tracking)",
+	Step = 0.1,
+	Value = {Min = 0.1, Max = 3.0, Default = 1.0},
+	Callback = function(value)
+		getgenv().pcAimAssist.SENSITIVITY = tonumber(value)
+	end,
+})
+
+AimTab:Slider({
+	Title = "Tracking Distance",
+	Desc = "Maximum distance to track enemies (studs)",
+	Step = 50,
+	Value = {Min = 100, Max = 1000, Default = 500},
+	Callback = function(value)
+		getgenv().pcAimAssist.TRACKING_DISTANCE = tonumber(value)
+	end,
 })
 
 
