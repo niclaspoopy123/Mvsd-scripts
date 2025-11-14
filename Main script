@@ -185,7 +185,7 @@ VEL_FILTER_ALPHA = 0.98, -- highly responsive velocity filter for faster reactio
 
 VELOCITY_PREDICTION_WEIGHT = 0.85, -- high weight for velocity-based prediction
 
-KALMAN_ENABLED = true,
+KALMAN_ENABLED = false,
 
 KALMAN = {
 
@@ -288,9 +288,9 @@ getgenv().knifePrediction = {
 
 ENABLED = true,
 
-PREDICTION_FACTOR = 0.03,
+PREDICTION_FACTOR = 0.05,
 
-MAX_DISTANCE = 7,
+MAX_DISTANCE = 12,
 
 }
 
@@ -499,11 +499,11 @@ getgenv().pixelHSVSupport = true -- Enable HSV color space for better color matc
 
 getgenv().pixelSubPixelInterpolation = true -- Sub-pixel interpolation for smoother tracking
 
-getgenv().pixelSilhouetteDetection = true -- Target silhouette detection
+getgenv().pixelSilhouetteDetection = false -- Target silhouette detection
 
 getgenv().pixelOutlineDetection = true -- Target outline detection
 
-getgenv().pixelPatternRecognition = true -- Advanced pattern recognition
+getgenv().pixelPatternRecognition = false -- Advanced pattern recognition
 
 getgenv().pixelMultiLayerDetection = true -- Multi-layer detection with fallback
 
