@@ -1,0 +1,41 @@
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.sublime-*
+
+# Log files
+*.log
+
+# Backup files
+*.backup
+backup/
+
+# Test files
+test/
+tests/
+*.test.lua
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Dependencies (if any)
+node_modules/
+vendor/
+
+# User-specific files
+config.local.lua
+settings.local.lua
