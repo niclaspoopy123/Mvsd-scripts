@@ -107,6 +107,82 @@ end
 
 ----------------------------------------------------
 
+-- Helper function to construct gun shooting arguments
+
+----------------------------------------------------
+
+local function constructShootGunArgs(targetPlayer, targetPosition)
+	local myChar = localPlayer.Character
+	if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then
+		return nil
+	end
+	
+	local camera = workspace.CurrentCamera
+	if not camera then return nil end
+	
+	local myPos = myChar.HumanoidRootPart.Position
+	local cameraPos = camera.CFrame.Position
+	local aimPos = targetPosition or (targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") and targetPlayer.Character.HumanoidRootPart.Position)
+	
+	if not aimPos then return nil end
+	
+	-- Construct the shooting arguments
+	local args = {
+		[1] = Vector3_new(cameraPos.X, cameraPos.Y, cameraPos.Z),
+		[2] = Vector3_new(aimPos.X, aimPos.Y, aimPos.Z),
+		[3] = targetPlayer,
+		[4] = Vector3_new(aimPos.X, aimPos.Y, aimPos.Z)
+	}
+	
+	return args
+end
+
+
+
+
+----------------------------------------------------
+
+-- Helper function to get nearest enemy
+
+----------------------------------------------------
+
+local function getNearestEnemy()
+	local myChar = localPlayer.Character
+	if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then
+		return nil
+	end
+	
+	local myPos = myChar.HumanoidRootPart.Position
+	local nearestEnemy = nil
+	local shortestDistance = math.huge
+	
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			-- Check team if enabled
+			if getgenv().teamCheckKill then
+				if localPlayer.Team and player.Team and localPlayer.Team == player.Team then
+					continue
+				end
+			end
+			
+			local enemyPos = player.Character.HumanoidRootPart.Position
+			local distance = (enemyPos - myPos).Magnitude
+			
+			if distance < shortestDistance then
+				shortestDistance = distance
+				nearestEnemy = player
+			end
+		end
+	end
+	
+	return nearestEnemy
+end
+
+
+
+
+----------------------------------------------------
+
 -- Repository URL for module loading
 
 ----------------------------------------------------
@@ -2811,9 +2887,12 @@ function AIAutoPlay:executeCombat(target)
 	if config.AUTO_SHOOT then
 		-- Check if within reasonable distance
 		if distance <= 500 then
-			local remoteGun = ReplicatedStorage:FindFirstChild("GunShoot")
-			if remoteGun then
-				remoteGun:FireServer()
+			local shootGunRemote = ReplicatedStorage.Remotes:FindFirstChild("ShootGun")
+			if shootGunRemote then
+				local args = constructShootGunArgs(target, targetPos)
+				if args then
+					shootGunRemote:FireServer(unpack(args))
+				end
 			end
 		end
 	end
@@ -4095,9 +4174,12 @@ local function performKillAll(weaponType)
 			if enemyRoot then
 				-- Fire the appropriate remote
 				if weaponType == "gun" then
-					local gunRemote = ReplicatedStorage:FindFirstChild("GunShoot")
-					if gunRemote then
-						gunRemote:FireServer()
+					local shootGunRemote = ReplicatedStorage.Remotes:FindFirstChild("ShootGun")
+					if shootGunRemote then
+						local args = constructShootGunArgs(player, enemyRoot.Position)
+						if args then
+							shootGunRemote:FireServer(unpack(args))
+						end
 					end
 				elseif weaponType == "knife" then
 					local knifeRemote = ReplicatedStorage:FindFirstChild("KnifeShoot") or ReplicatedStorage.Remotes:FindFirstChild("ThrowStart")
@@ -4426,11 +4508,19 @@ if nearestEnemy then
 
 myChar.HumanoidRootPart.CFrame = nearestEnemy.Character.HumanoidRootPart.CFrame
 
-local remoteGun = ReplicatedStorage:FindFirstChild("GunShoot")
+local shootGunRemote = ReplicatedStorage.Remotes:FindFirstChild("ShootGun")
 
-if remoteGun then
+if shootGunRemote then
 
-remoteGun:FireServer()
+local enemyPos = nearestEnemy.Character.HumanoidRootPart.Position
+
+local args = constructShootGunArgs(nearestEnemy, enemyPos)
+
+if args then
+
+shootGunRemote:FireServer(unpack(args))
+
+end
 
 end
 
@@ -4881,11 +4971,29 @@ task_spawn(function()
 
 while getgenv().spamGunActive do
 
-local remote = ReplicatedStorage:FindFirstChild("GunShoot")
+local shootGunRemote = ReplicatedStorage.Remotes:FindFirstChild("ShootGun")
 
-if remote then
+if shootGunRemote then
 
-remote:FireServer()
+local target = getNearestEnemy()
+
+if target then
+
+local targetPos = target.Character and target.Character:FindFirstChild("HumanoidRootPart") and target.Character.HumanoidRootPart.Position
+
+if targetPos then
+
+local args = constructShootGunArgs(target, targetPos)
+
+if args then
+
+shootGunRemote:FireServer(unpack(args))
+
+end
+
+end
+
+end
 
 end
 
@@ -4923,11 +5031,29 @@ task_spawn(function()
 
 while getgenv().loopGunShootActive do
 
-local remote = ReplicatedStorage:FindFirstChild("GunShoot")
+local shootGunRemote = ReplicatedStorage.Remotes:FindFirstChild("ShootGun")
 
-if remote then
+if shootGunRemote then
 
-remote:FireServer()
+local target = getNearestEnemy()
+
+if target then
+
+local targetPos = target.Character and target.Character:FindFirstChild("HumanoidRootPart") and target.Character.HumanoidRootPart.Position
+
+if targetPos then
+
+local args = constructShootGunArgs(target, targetPos)
+
+if args then
+
+shootGunRemote:FireServer(unpack(args))
+
+end
+
+end
+
+end
 
 end
 
@@ -4993,11 +5119,29 @@ Desc = "Simulate a normal gun shoot event once.",
 
 Callback = function()
 
-local remote = ReplicatedStorage:FindFirstChild("GunShoot")
+local shootGunRemote = ReplicatedStorage.Remotes:FindFirstChild("ShootGun")
 
-if remote then
+if shootGunRemote then
 
-remote:FireServer()
+local target = getNearestEnemy()
+
+if target then
+
+local targetPos = target.Character and target.Character:FindFirstChild("HumanoidRootPart") and target.Character.HumanoidRootPart.Position
+
+if targetPos then
+
+local args = constructShootGunArgs(target, targetPos)
+
+if args then
+
+shootGunRemote:FireServer(unpack(args))
+
+end
+
+end
+
+end
 
 end
 
@@ -5125,13 +5269,19 @@ end
 
 if bestTarget and bestPredictedPos then
 
-local remote = ReplicatedStorage:FindFirstChild("GunShoot")
+local shootGunRemote = ReplicatedStorage.Remotes:FindFirstChild("ShootGun")
 
-if remote then
+if shootGunRemote then
 
-remote:FireServer()
+local args = constructShootGunArgs(bestTarget, bestPredictedPos)
+
+if args then
+
+shootGunRemote:FireServer(unpack(args))
 
 lastShoot = currentTime
+
+end
 
 end
 
